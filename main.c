@@ -5,7 +5,6 @@
 
 #include <SDL.h>
 #include <SDL_video.h>
-//~ #include <SDL_timer.h>
 
 #include "common.h"
 #define INPUTSTART 0x0200
@@ -23,7 +22,6 @@ uint8_t mem[1<<16];
 SDL_Window *Win;
 SDL_Surface *WinSurf;
 SDL_Surface *Screen;
-//~ SDL_Surface *Chars;
 uint8_t palette[] = { // pico-8's colours
 	0x00, 0x00, 0x00, // R,G,B
 	0x5f, 0x57, 0x50,
@@ -79,21 +77,11 @@ uint8_t inputread(uint16_t reg) {
 	}
 }
 void inputwrite(uint16_t reg, uint8_t value) {
-	//~ printf("$%X = %X\n", addr, value);
-	//~ if (addr >= CHARSSTART && addr <= CHARSSTART+0x800) {
-		//~ // horrible remapping, can't even explain it
-		//~ addr -= CHARSSTART;
-		//~ addr = (addr%16)*8 + (addr%128)/16 + (addr/128)*128;
-		//~ addr += CHARSSTART;
-	//~ }
 	mem[reg] = value;
 }
 
 uint8_t read6502(uint16_t addr) {
 	READPERIPH(INPUTSTART, 2, inputread)
-	//~ if (addr >= INPUTSTART && addr <= INPUTSTART+0x800) {
-		//~ return readinput(addr - INPUTSTART);
-	//~ }
 	return mem[addr];
 }
 void write6502(uint16_t addr, uint8_t value) {
@@ -147,7 +135,6 @@ int initialise() {
 	loadtomem("a.o65", 0xE000);
 	memset(&mem[SCREENSTART+768], 0x60, 768);
 
-	//~ SDL_SetHint(SDL_HINT_FRAMEBUFFER_ACCELERATION, "1");
 	SDL_Init(SDL_INIT_VIDEO);
 	Win = SDL_CreateWindow("XY Brewer", \
 		SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, \
@@ -155,14 +142,6 @@ int initialise() {
 	WinSurf = SDL_GetWindowSurface(Win);
 	Screen = SDL_CreateRGBSurfaceWithFormat(0, TILEW*(SCREENW+2*BORDERW), TILEH*(SCREENH+2*BORDERW), \
 		WinSurf->format->BitsPerPixel, WinSurf->format->format);
-		//~ WinSurf->format->BitsPerPixel, SDL_PIXELFORMAT_RGBA32);
-	//~ SDL_SetSurfaceRLE(Screen, 1);
-
-	//~ Chars = SDL_CreateRGBSurfaceFrom((void*)&mem[CHARSSTART], 128, 128, 1, 16, 1,1,1,0);
-	//~ SDL_Color tmp;
-	//~ tmp = Chars->format->palette->colors[0];
-	//~ Chars->format->palette->colors[0] = Chars->format->palette->colors[1];
-	//~ Chars->format->palette->colors[1] = tmp;
 }
 
 void drawglyph(uint8_t glyph, int x, int y) {
@@ -185,33 +164,9 @@ void drawglyph(uint8_t glyph, int x, int y) {
 				index = bg;
 			}
 			pixels[sy*WINDOWW+sx] = SDL_MapRGB(Screen->format, palette[index], palette[index+1], palette[index+2]);
-			//~ sx++;
 		}
-		//~ sy++;
 	}
 }
-
-/*void drawglyph(uint8_t glyph, int x, int y) {
-	SDL_Rect glyphrect, scrrect;
-	int gx, gy;
-	gx = glyph % 16;
-	gy = glyph / 16;
-
-	glyphrect.x = gx*TILEW;
-	glyphrect.y = gy*TILEH;
-	glyphrect.w = TILEW;
-	glyphrect.h = TILEH;
-
-	scrrect.x = (x+BORDERW)*TILEW;
-	scrrect.y = (y+BORDERW)*TILEH;
-	scrrect.w = TILEW;
-	scrrect.h = TILEH;
-
-	//~ COLORSET(back);
-	//~ SDL_RenderFillRect(Ren, &scrrect);
-	//~ SDL_SetTextureColorMod(Codepage, fore.r, fore.g, fore.b);
-	SDL_BlitSurface(Chars, &glyphrect, Screen, &scrrect);
-}*/
 
 void drawscreen() {
 	//~ for (int i=0; i<256; i++) {
