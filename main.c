@@ -128,11 +128,11 @@ int loadchars(char *fname, uint16_t addr) {
 	fclose(f);
 }
 
-int initialise() {
+int initialise(char *romname) {
 	write16(0xFFFC, 0xE000); // set initial pc
 
 	loadchars("chars.gray", 0xD700);
-	loadtomem("a.o65", 0xE000);
+	loadtomem(romname, 0xE000);
 	memset(&mem[SCREENSTART+768], 0x60, 768);
 
 	SDL_Init(SDL_INIT_VIDEO);
@@ -188,9 +188,10 @@ void handlekeyevent(SDL_KeyboardEvent *e) {
 	}
 }
 
-int main() {
+int main(int argc, char **argv) {
 
-	initialise();
+	if (argc>1) initialise(argv[1]);
+	else initialise("a.o65");
 	reset6502();
 	uint64_t countfreq = SDL_GetPerformanceFrequency();
 	uint64_t clumpcount = countfreq / 1000000 * CLUMPSIZE;
