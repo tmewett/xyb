@@ -141,7 +141,7 @@ int initialise(char *romname) {
 		SCALE*TILEW*(SCREENW+2*BORDERW), SCALE*TILEH*(SCREENH+2*BORDERW), 0);
 	WinSurf = SDL_GetWindowSurface(Win);
 	Screen = SDL_CreateRGBSurfaceWithFormat(0, TILEW*(SCREENW+2*BORDERW), TILEH*(SCREENH+2*BORDERW), \
-		WinSurf->format->BitsPerPixel, WinSurf->format->format);
+		32, SDL_PIXELFORMAT_RGBA32);
 }
 
 void drawglyph(uint8_t glyph, int x, int y) {
