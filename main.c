@@ -1,10 +1,10 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <errno.h>
-#include <unistd.h>
 
 #include <SDL.h>
 #include <SDL_video.h>
+#include <SDL_timer.h>
 
 #include "common.h"
 #define INPUTSTART 0x0200
@@ -226,7 +226,7 @@ int main(int argc, char **argv) {
 		if (count <= clumpcount) {
 			uint64_t extra = MIN(overcount, clumpcount-count);
 			overcount -= extra;
-			usleep((1000000-10000)*(clumpcount-(count+extra))/countfreq); // -10000 to account for small overheads
+			SDL_Delay(1000*(clumpcount-(count+extra))/countfreq);
 		} else {
 			overcount += count - clumpcount;
 		}
