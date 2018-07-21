@@ -79,20 +79,22 @@ bool keydown[SHIFTGRIDSIZE+KEYGRIDSIZE];
 		return;\
 	}
 
+uint8_t _kbrow;
 uint8_t inputread(uint16_t reg) {
-	static uint8_t kbrow;
 	if (reg==0) {
-		return kbrow;
+		return _kbrow;
 	} else {
 		uint8_t res = 0;
 		for (int i=0; i<8; i++) {
-			res |= keydown[kbrow*8+i] << i;
+			res |= keydown[_kbrow*8+i] << i;
 		}
 		return res;
 	}
 }
 void inputwrite(uint16_t reg, uint8_t value) {
-	mem[reg] = value;
+	if (reg==0) {
+		_kbrow = value;
+	}
 }
 
 uint8_t read6502(uint16_t addr) {
