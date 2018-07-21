@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdbool.h>
+#include <string.h>
 #include <errno.h>
 
 #include <SDL.h>
@@ -17,6 +18,8 @@
 
 #define MIN(x, y) ((x)<(y)?(x):(y))
 #define MASKBIT(val, bit) ((val)>>(bit)&1)
+
+#define DBGPRINTF(s, ...) printf((s), __VA_ARGS__)
 
 uint8_t mem[1<<16];
 SDL_Window *Win;
@@ -40,19 +43,31 @@ uint8_t palette[] = { // pico-8's colours
 	0x22, 0x2e, 0x53,
 	0x2c, 0xab, 0xfe
 };
+
+// all keys whose locations we don't know for certain are handled by TextInputEvents
+char *shiftkeygrid[] = {
+	//~ ! \" ~ $ % & (
+	//~ ) * : < > ? @ ^
+	//~ _ \\ # { }
+	"!", "\"", "~", "$", "%", "&", "(",
+	")", "*", ":", "<", ">", "?", "@", "^",
+	"_", "\\", "#", "{", "}"
+};
+// unshifted keys with standard positions
 SDL_Keycode keygrid[] = {
-	SDLK_SPACE, SDLK_EXCLAIM, SDLK_QUOTEDBL, SDLK_HASH, SDLK_DOLLAR, SDLK_PERCENT, SDLK_AMPERSAND, SDLK_QUOTE,
-	SDLK_LEFTPAREN, SDLK_RIGHTPAREN, SDLK_ASTERISK, SDLK_PLUS, SDLK_COMMA, SDLK_MINUS, SDLK_PERIOD, SDLK_SLASH,
+	SDLK_QUOTE, SDLK_COMMA, SDLK_MINUS, SDLK_PERIOD, SDLK_SLASH,
 	SDLK_0, SDLK_1, SDLK_2, SDLK_3, SDLK_4, SDLK_5, SDLK_6, SDLK_7,
-	SDLK_8, SDLK_9, SDLK_COLON, SDLK_SEMICOLON, SDLK_LESS, SDLK_EQUALS, SDLK_GREATER, SDLK_QUESTION,
-	SDLK_AT, SDLK_a, SDLK_b, SDLK_c, SDLK_d, SDLK_e, SDLK_f, SDLK_g,
+	SDLK_8, SDLK_9, SDLK_SEMICOLON, SDLK_EQUALS, SDLK_QUESTION,
+	SDLK_a, SDLK_b, SDLK_c, SDLK_d, SDLK_e, SDLK_f, SDLK_g,
 	SDLK_h, SDLK_i, SDLK_j, SDLK_k, SDLK_l, SDLK_m, SDLK_n, SDLK_o,
 	SDLK_p, SDLK_q, SDLK_r, SDLK_s, SDLK_t, SDLK_u, SDLK_v, SDLK_w,
-	SDLK_x, SDLK_y, SDLK_z, SDLK_LEFTBRACKET, SDLK_BACKSLASH, SDLK_RIGHTBRACKET, SDLK_CARET, SDLK_UNDERSCORE,
-	SDLK_BACKQUOTE, SDLK_BACKSPACE, SDLK_RETURN, SDLK_LSHIFT, SDLK_LCTRL
+	SDLK_x, SDLK_y, SDLK_z, SDLK_LEFTBRACKET, SDLK_RIGHTBRACKET,
+	SDLK_BACKQUOTE, SDLK_BACKSPACE, SDLK_RETURN, SDLK_LSHIFT, SDLK_LCTRL, SDLK_SPACE
 };
-#define KEYGRIDSIZE (9*8-1)
-bool keydown[KEYGRIDSIZE];
+#define SHIFTGRIDSIZE 20
+#define KEYGRIDSIZE 52
+
+bool keydown[SHIFTGRIDSIZE+KEYGRIDSIZE];
 
 #define READPERIPH(start, len, function) \
 	if (addr >= start && addr <= start+len) {\
@@ -180,9 +195,35 @@ void drawscreen() {
 
 void handlekeyevent(SDL_KeyboardEvent *e) {
 	SDL_Keycode code = e->keysym.sym;
-	for (int i=0; i<KEYGRIDSIZE; i++) {
+
+	// release all shifted keys on ANY keyup
+	if (e->type == SDL_KEYUP) {
+		for (int i=0; i < SHIFTGRIDSIZE; i++) {
+			if (keydown[i]) DBGPRINTF("%s up\n", shiftkeygrid[i]);
+			keydown[i] = false;
+		}
+	}
+
+	// don't distinguish either ctrl or shift keys
+	if (code == SDLK_RCTRL) code = SDLK_LCTRL;
+	else if (code == SDLK_RSHIFT) code = SDLK_LSHIFT;
+
+	for (int i=0; i < KEYGRIDSIZE; i++) {
 		if (keygrid[i] == code) {
-			keydown[i] = e->type == SDL_KEYDOWN;
+			if (e->type == SDL_KEYUP && keydown[SHIFTGRIDSIZE+i] || e->type == SDL_KEYDOWN)
+				DBGPRINTF("%s %s\n", SDL_GetKeyName(keygrid[i]), e->type == SDL_KEYDOWN ? "down" : "up");
+			keydown[SHIFTGRIDSIZE+i] = e->type == SDL_KEYDOWN;
+			break;
+		}
+	}
+}
+
+void handletextevent(SDL_TextInputEvent *e) {
+	char *text = e->text;
+	for (int i=0; i < SHIFTGRIDSIZE; i++) {
+		if (strcmp(text, shiftkeygrid[i]) == 0) {
+			keydown[i] = true;
+			DBGPRINTF("%s down\n", shiftkeygrid[i]);
 			break;
 		}
 	}
@@ -212,6 +253,8 @@ int main(int argc, char **argv) {
 			break;
 		} else if ((e.type == SDL_KEYDOWN || e.type == SDL_KEYUP) && !e.key.repeat) {
 			handlekeyevent(&e.key);
+		} else if (e.type == SDL_TEXTINPUT) {
+			handletextevent(&e.text);
 		}
 
 		exec6502(CLUMPSIZE);
