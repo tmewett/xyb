@@ -6,6 +6,7 @@
 #include <SDL.h>
 #include <SDL_video.h>
 #include <SDL_timer.h>
+#include <SDL_mouse.h>
 
 #include "common.h"
 #define INPUTSTART 0x0200
@@ -17,6 +18,8 @@
 #define DRAWTICKS 33333 // minimum no. of cpu ticks before redraw
 
 #define MIN(x, y) ((x)<(y)?(x):(y))
+#define MAX(x, y) ((x)>(y)?(x):(y))
+#define CLAMP(x, xmin, xmax) MIN((xmax), MAX((x), (xmin)))
 #define MASKBIT(val, bit) ((val)>>(bit)&1)
 
 #define DBGPRINTF(s, ...) printf((s), __VA_ARGS__)
@@ -79,31 +82,55 @@ bool keydown[SHIFTGRIDSIZE+KEYGRIDSIZE];
 		return;\
 	}
 
-uint8_t _kbrow;
+// mousereg - XYLMRxxx
+uint8_t _kbrow, _mousereg;
 uint8_t inputread(uint16_t reg) {
 	if (reg==0) {
 		return _kbrow;
-	} else {
+	} else if (reg==1) {
 		uint8_t res = 0;
 		for (int i=0; i<8; i++) {
 			res |= keydown[_kbrow*8+i] << i;
 		}
 		return res;
+	} else if (reg==2) {
+		uint32_t state = SDL_GetMouseState(NULL, NULL);
+		int buttons = 0;
+		if (state & SDL_BUTTON(SDL_BUTTON_LEFT)) buttons |= 1<<5;
+		if (state & SDL_BUTTON(SDL_BUTTON_MIDDLE)) buttons |= 1<<4;
+		if (state & SDL_BUTTON(SDL_BUTTON_RIGHT)) buttons |= 1<<3;
+		return _mousereg | buttons;
+	} else if (reg==3) {
+		signed int x;
+		uint32_t state = SDL_GetMouseState(&x, NULL);
+		x /= SCALE;
+		x = CLAMP(x - TILEW*BORDERW, 0, SCREENW*TILEW-1);
+		if (_mousereg & 1<<7) x /= TILEW;
+		return x;
+	} else if (reg==4) {
+		signed int y;
+		uint32_t state = SDL_GetMouseState(NULL, &y);
+		y /= SCALE;
+		y = CLAMP(y - TILEH*BORDERW, 0, SCREENH*TILEH-1);
+		if (_mousereg & 1<<7) y /= TILEH;
+		return y;
 	}
 }
 void inputwrite(uint16_t reg, uint8_t value) {
 	if (reg==0) {
 		_kbrow = value;
+	} else if (reg==2) {
+		_mousereg = value & 0xC0;
 	}
 }
 
 uint8_t read6502(uint16_t addr) {
-	READPERIPH(INPUTSTART, 2, inputread)
+	READPERIPH(INPUTSTART, 5, inputread)
 	return mem[addr];
 }
 void write6502(uint16_t addr, uint8_t value) {
 	//~ printf("$%X = %X\n", addr, value);
-	WRITEPERIPH(INPUTSTART, 2, inputwrite)
+	WRITEPERIPH(INPUTSTART, 5, inputwrite)
 	mem[addr] = value;
 }
 
