@@ -11,8 +11,8 @@
 #include "common.h"
 #define INPUTSTART 0x0200
 #define ROMSTART 0xE000
-#define CHARSSTART 0xD700
-#define SCREENSTART 0xCF00
+#define CHARSSTART 0xD800 // 0x800=2048 before ROM
+#define SCREENSTART 0xD000 // 0x800 before chars
 #define SCALE 3
 #define CLUMPSIZE 10000 // no. of cpu ticks to do between throttling
 #define DRAWTICKS 33333 // minimum no. of cpu ticks before redraw
@@ -151,7 +151,7 @@ int loadtomem(char *fname, uint16_t addr) {
 		perror("loadtomem");
 		exit(1);
 	}
-	fread(&mem[addr], 1, 1<<16-1-addr, f);
+	fread(&mem[addr], 1, 0x10000-addr, f);
 	fclose(f);
 }
 
@@ -173,10 +173,10 @@ int loadchars(char *fname, uint16_t addr) {
 }
 
 int initialise(char *romname) {
-	write16(0xFFFC, 0xE000); // set initial pc
+	write16(0xFFFC, ROMSTART); // set initial pc
 
-	loadchars("chars.gray", 0xD700);
-	loadtomem(romname, 0xE000);
+	loadchars("chars.gray", CHARSSTART);
+	loadtomem(romname, ROMSTART);
 	memset(&mem[SCREENSTART+768], 0x60, 768);
 
 	SDL_Init(SDL_INIT_VIDEO);
@@ -189,13 +189,13 @@ int initialise(char *romname) {
 }
 
 void drawglyph(uint8_t glyph, int x, int y) {
-	uint8_t colbyte = read6502(SCREENSTART+768+y*SCREENW+x);
+	uint8_t colbyte = mem[SCREENSTART+768+y*SCREENW+x];
 	int fg = (colbyte >> 4) & 0xF;
 	int bg = colbyte & 0xF;
 	fg *= 3; bg *= 3;
 	uint32_t *pixels = (uint32_t *)Screen->pixels;
 	for (int gy=0; gy<8; gy++) {
-		uint8_t bits = read6502(0xD700+glyph*8+gy);
+		uint8_t bits = mem[CHARSSTART+glyph*8+gy];
 		int sy = TILEH*(y+BORDERW) + gy;
 		for (int gx=0; gx<8; gx++) {
 			int sx = TILEW*(x+BORDERW) + gx;
