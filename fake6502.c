@@ -946,6 +946,35 @@ void exec6502(uint32_t tickcount) {
 
 }
 
+void run6502() {
+    uint32_t lastdraw = 0, lastevents = 0;
+
+    while (1) {
+        opcode = read6502(pc++);
+        status |= FLAG_CONSTANT;
+
+        penaltyop = 0;
+        penaltyaddr = 0;
+
+        (*addrtable[opcode])();
+        (*optable[opcode])();
+        clockticks6502 += ticktable[opcode];
+        if (penaltyop && penaltyaddr) clockticks6502++;
+
+        instructions++;
+
+        if (clockticks6502 > lastevents + CLUMPSIZE) {
+            lastevents += CLUMPSIZE;
+            if (handleevents()) return;
+        }
+        if (clockticks6502 > lastdraw + DRAWTICKS) {
+            lastdraw += DRAWTICKS;
+            drawscreen();
+        }
+    }
+
+}
+
 void step6502() {
     opcode = read6502(pc++);
     status |= FLAG_CONSTANT;

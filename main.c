@@ -14,8 +14,6 @@
 #define CHARSSTART 0xD800 // 0x800=2048 before ROM
 #define SCREENSTART 0xD000 // 0x800 before chars
 #define SCALE 3
-#define CLUMPSIZE 10000 // no. of cpu ticks to do between throttling
-#define DRAWTICKS 33333 // minimum no. of cpu ticks before redraw
 
 #define MIN(x, y) ((x)<(y)?(x):(y))
 #define MAX(x, y) ((x)>(y)?(x):(y))
@@ -212,6 +210,7 @@ void drawglyph(uint8_t glyph, int x, int y) {
 	}
 }
 
+int frames = 0;
 void drawscreen() {
 	//~ for (int i=0; i<256; i++) {
 	for (int i=0; i<SCREENH*SCREENW; i++) {
@@ -220,6 +219,7 @@ void drawscreen() {
 	}
 	SDL_BlitScaled(Screen, NULL, WinSurf, NULL);
 	SDL_UpdateWindowSurface(Win);
+	frames++;
 }
 
 void handlekeyevent(SDL_KeyboardEvent *e) {
@@ -263,38 +263,37 @@ int main(int argc, char **argv) {
 	if (argc>1) initialise(argv[1]);
 	else initialise("a.o65");
 	reset6502();
-	uint64_t countfreq = SDL_GetPerformanceFrequency();
-	uint64_t clumpcount = countfreq / 1000000 * CLUMPSIZE;
-
-
 	uint64_t total = SDL_GetPerformanceCounter();
-	int frames = 0;
+
+	run6502();
+
+	uint64_t countfreq = SDL_GetPerformanceFrequency();
+	total = SDL_GetPerformanceCounter()-total;
+	printf("Averaged %f MHz CPU, %f FPS\n", \
+		1.0/((float)(total)/clockticks6502/countfreq*CPUFREQ), \
+		 (float)countfreq*frames/total);
+	SDL_Quit();
+	return 0;
+}
+
+int handleevents() {
+	static uint64_t last, overcount;
+	uint64_t countfreq = SDL_GetPerformanceFrequency();
+	uint64_t clumpcount = countfreq / CPUFREQ * CLUMPSIZE;
 
 	SDL_Event e;
-	//~ int quit = 0;
-	uint64_t overcount = 0;
-	uint32_t lastdraw = clockticks6502;
-	for (;;) {
-		uint64_t last = SDL_GetPerformanceCounter();
+	SDL_PollEvent(&e);
+	if (e.type == SDL_QUIT) {
+		return 1;
+	} else if ((e.type == SDL_KEYDOWN || e.type == SDL_KEYUP) && !e.key.repeat) {
+		handlekeyevent(&e.key);
+	} else if (e.type == SDL_TEXTINPUT) {
+		handletextevent(&e.text);
+	}
 
-		SDL_PollEvent(&e);
-		if (e.type == SDL_QUIT) {
-			break;
-		} else if ((e.type == SDL_KEYDOWN || e.type == SDL_KEYUP) && !e.key.repeat) {
-			handlekeyevent(&e.key);
-		} else if (e.type == SDL_TEXTINPUT) {
-			handletextevent(&e.text);
-		}
+	uint64_t count = SDL_GetPerformanceCounter() - last;
 
-		exec6502(CLUMPSIZE);
-		if (clockticks6502 > lastdraw + DRAWTICKS) {
-			lastdraw += DRAWTICKS;
-			drawscreen();
-			frames++;
-		}
-		uint64_t count = SDL_GetPerformanceCounter() - last;
-
-		// can we rewrite this throttle as simply as drawing one above? would be a busy wait...
+	if (last != 0) { // don't sleep on first invocation
 		if (count <= clumpcount) {
 			uint64_t extra = MIN(overcount, clumpcount-count);
 			overcount -= extra;
@@ -304,10 +303,6 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	total = SDL_GetPerformanceCounter()-total;
-	printf("Averaged %f MHz CPU, %f FPS\n", \
-		1.0/((float)(total)/clockticks6502/countfreq*1000000), \
-		 (float)countfreq*frames/total);
-	SDL_Quit();
+	last = SDL_GetPerformanceCounter();
 	return 0;
 }
