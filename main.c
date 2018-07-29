@@ -9,6 +9,15 @@
 #include <SDL_mouse.h>
 
 #include "common.h"
+
+#define TILEW 8
+#define TILEH 8
+#define SCREENW 32
+#define SCREENH 24
+#define BORDERW 3
+#define WINDOWW (TILEW*(SCREENW+2*BORDERW))
+#define WINDOWH (TILEH*(SCREENH+2*BORDERW))
+
 #define INPUTSTART 0x0200
 #define ROMSTART 0xE000
 #define CHARSSTART 0xD800 // 0x800=2048 before ROM
@@ -178,12 +187,10 @@ int initialise(char *romname) {
 	memset(&mem[SCREENSTART+768], 0x60, 768);
 
 	SDL_Init(SDL_INIT_VIDEO);
-	Win = SDL_CreateWindow("XY Brewer", \
-		SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, \
-		SCALE*TILEW*(SCREENW+2*BORDERW), SCALE*TILEH*(SCREENH+2*BORDERW), 0);
+	Win = SDL_CreateWindow("XY Brewer", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, \
+		SCALE*WINDOWW, SCALE*WINDOWH, 0);
 	WinSurf = SDL_GetWindowSurface(Win);
-	Screen = SDL_CreateRGBSurfaceWithFormat(0, TILEW*(SCREENW+2*BORDERW), TILEH*(SCREENH+2*BORDERW), \
-		32, SDL_PIXELFORMAT_RGBA32);
+	Screen = SDL_CreateRGBSurfaceWithFormat(0, WINDOWW, WINDOWH, 32, SDL_PIXELFORMAT_RGBA32);
 }
 
 void drawglyph(uint8_t glyph, int x, int y) {
