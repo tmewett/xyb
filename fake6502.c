@@ -105,6 +105,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include "common.h"
+uint32_t SDL_GetTicks();
 
 //6502 defines
 //~ #define UNDOCUMENTED //when this is defined, undocumented opcodes are handled.
@@ -915,6 +916,8 @@ void nmi6502() {
 }
 
 void irq6502() {
+    static int n = 0;
+    printf("IRQ #%d\n", ++n);
     push16(pc);
     push8(status);
     status |= FLAG_INTERRUPT;
@@ -946,6 +949,7 @@ void exec6502(uint32_t tickcount) {
 
 }
 
+uint32_t lasttimer[2]; // exported
 void run6502() {
     uint32_t lastdraw = 0, lastevents = 0;
 
@@ -971,6 +975,16 @@ void run6502() {
             lastdraw += DRAWTICKS;
             drawscreen();
         }
+
+        int irq = 0;
+        for (int n=0; n < 2; n++) {
+            if (SDL_GetTicks() > lasttimer[n]) {
+                lasttimer[n]++;
+                irq |= updatetimer(n);
+            }
+        }
+        // can't call irq more than once or we clutter the stack
+        if (irq) irq6502();
     }
 
 }

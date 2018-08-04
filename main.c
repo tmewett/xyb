@@ -17,12 +17,14 @@
 #define BORDERW 3
 #define WINDOWW (TILEW*(SCREENW+2*BORDERW))
 #define WINDOWH (TILEH*(SCREENH+2*BORDERW))
+#define SCALE 3
 
 #define INPUTSTART 0x0200
+#define TIMERSTART 0x0205
+
 #define ROMSTART 0xE000
 #define CHARSSTART 0xD800 // 0x800=2048 before ROM
 #define SCREENSTART 0xD000 // 0x800 before chars
-#define SCALE 3
 
 #define MIN(x, y) ((x)<(y)?(x):(y))
 #define MAX(x, y) ((x)>(y)?(x):(y))
@@ -131,13 +133,59 @@ void inputwrite(uint16_t reg, uint8_t value) {
 	}
 }
 
+// ERIFxxxx
+uint8_t _timerreg[2];
+uint16_t _timerval[2];
+uint16_t _timerinit[2];
+uint8_t timerread(uint16_t reg) {
+	int n = reg/3;
+	reg %= 3;
+	if (reg==0) {
+		return _timerreg[n];
+	} else {
+		return (_timerval[n] >> 8*(reg-1)) & 0xFF;
+	}
+}
+void timerwrite(uint16_t reg, uint8_t value) {
+	int n = reg/3;
+	reg %= 3;
+	if (reg==0) {
+		// is enable going 0 -> 1 ?
+		if (value & 0x80 && !(_timerreg[n] & 0x80)) lasttimer[n] = SDL_GetTicks();
+		_timerreg[n] = value;
+	} else {
+		// unset enable
+		_timerreg[n] &= ~0x8F;
+		// set appropriate byte (hacky)
+		_timerinit[n] &= 0xFF00 >> 8*(reg-1);
+		_timerinit[n] |= (uint16_t)value << 8*(reg-1);
+		_timerval[n] = _timerinit[n];
+	}
+}
+int updatetimer(int n) {
+	int irq = 0;
+	if (!(_timerreg[n] & 0x80)) return 0; // skip if disabled
+	if (_timerval[n] == 1) { // about to hit zero?
+		_timerval[n] -= 1;
+		_timerreg[n] |= 0x10; // set flag
+		if (_timerreg[n] & 0x20) irq = true;
+		if (_timerreg[n] & 0x40) _timerval[n] = _timerinit[n]; // refill if set
+		else _timerreg[n] &= ~0x8F; // disable otherwise
+	} else
+		_timerval[n] -= 1;
+	return irq;
+}
+
+
 uint8_t read6502(uint16_t addr) {
 	READPERIPH(INPUTSTART, 5, inputread)
+	else READPERIPH(TIMERSTART, 6, timerread)
 	return mem[addr];
 }
 void write6502(uint16_t addr, uint8_t value) {
 	//~ printf("$%X = %X\n", addr, value);
 	WRITEPERIPH(INPUTSTART, 5, inputwrite)
+	else WRITEPERIPH(TIMERSTART, 6, timerwrite)
 	mem[addr] = value;
 }
 
@@ -181,6 +229,7 @@ int loadchars(char *fname, uint16_t addr) {
 
 int initialise(char *romname) {
 	write16(0xFFFC, ROMSTART); // set initial pc
+	write16(0xFFFE, ROMSTART); // for now, restart on IRQ
 
 	loadchars("chars.gray", CHARSSTART);
 	loadtomem(romname, ROMSTART);

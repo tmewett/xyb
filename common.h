@@ -7,6 +7,8 @@ void write6502(uint16_t address, uint8_t value);
 void reset6502();
 void run6502();
 extern uint32_t clockticks6502;
+extern uint32_t lasttimer[2];
 
 int handleevents();
 void drawscreen();
+int updatetimer(int n);
