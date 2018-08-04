@@ -951,7 +951,7 @@ void exec6502(uint32_t tickcount) {
 
 uint32_t lasttimer[2]; // exported
 void run6502() {
-    uint32_t lastdraw = 0, lastevents = 0;
+    uint32_t lastdraw = 0, lastevents = 0, lasttimercheck = 0;
 
     while (1) {
         opcode = read6502(pc++);
@@ -976,15 +976,19 @@ void run6502() {
             drawscreen();
         }
 
-        int irq = 0;
-        for (int n=0; n < 2; n++) {
-            if (SDL_GetTicks() > lasttimer[n]) {
-                lasttimer[n]++;
-                irq |= updatetimer(n);
+        if (clockticks6502 > lasttimercheck + CPUFREQ/2000) {
+            lasttimercheck = clockticks6502;
+            uint32_t time = SDL_GetTicks();
+            int irq = 0;
+            for (int n=0; n < 2; n++) {
+                if (time > lasttimer[n]) {
+                    lasttimer[n]++;
+                    irq |= updatetimer(n);
+                }
             }
+            // can't call irq more than once or we clutter the stack
+            if (irq) irq6502();
         }
-        // can't call irq more than once or we clutter the stack
-        if (irq) irq6502();
     }
 
 }
