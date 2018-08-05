@@ -19,8 +19,9 @@
 #define WINDOWH (TILEH*(SCREENH+2*BORDERW))
 #define SCALE 3
 
-#define INPUTSTART 0x0200
-#define TIMERSTART 0x0205
+#define PERIPHSTART 0x0200
+#define INPUTLEN 5
+#define TIMERLEN 3
 
 #define ROMSTART 0xE000
 #define CHARSSTART 0xD800 // 0x800=2048 before ROM
@@ -81,15 +82,17 @@ SDL_Keycode keygrid[] = {
 
 bool keydown[SHIFTGRIDSIZE+KEYGRIDSIZE];
 
-#define READPERIPH(start, len, function) \
-	if (addr >= start && addr <= start+len) {\
-		return function(addr-start);\
-	}
-#define WRITEPERIPH(start, len, function) \
-	if (addr >= start && addr <= start+len) {\
-		function(addr-start, value);\
+#define READPERIPH(peri, len) \
+	if (addr >= base && addr <= base+len) {\
+		return peri##read(addr-base);\
+	}\
+	base += len;
+#define WRITEPERIPH(peri, len) \
+	if (addr >= base && addr <= base+len) {\
+		peri##write(addr-base, value);\
 		return;\
-	}
+	}\
+	base += len;
 
 // mousereg - XYLMRxxx
 uint8_t _kbrow, _mousereg;
@@ -178,14 +181,16 @@ int updatetimer(int n) {
 
 
 uint8_t read6502(uint16_t addr) {
-	READPERIPH(INPUTSTART, 5, inputread)
-	else READPERIPH(TIMERSTART, 6, timerread)
+	int base = PERIPHSTART;
+	READPERIPH(input, INPUTLEN);
+	READPERIPH(timer, 2*TIMERLEN);
 	return mem[addr];
 }
 void write6502(uint16_t addr, uint8_t value) {
 	//~ printf("$%X = %X\n", addr, value);
-	WRITEPERIPH(INPUTSTART, 5, inputwrite)
-	else WRITEPERIPH(TIMERSTART, 6, timerwrite)
+	int base = PERIPHSTART;
+	WRITEPERIPH(input, INPUTLEN);
+	WRITEPERIPH(timer, 2*TIMERLEN);
 	mem[addr] = value;
 }
 
