@@ -57,28 +57,32 @@ uint8_t palette[] = { // pico-8's colours
 	0x2c, 0xab, 0xfe
 };
 
+// for convenience, the grid should be ordered into uncased, cased, and non-printing regions
+// TODO tidy this up
 // all keys whose locations we don't know for certain are handled by TextInputEvents
 char *shiftkeygrid[] = {
 	//~ ! \" ~ $ % & (
-	//~ ) * : < > ? @ ^
+	//~ ) * + : < > ? @ ^
 	//~ _ \\ # { }
 	"!", "\"", "~", "$", "%", "&", "(",
-	")", "*", ":", "<", ">", "?", "@", "^",
+	")", "*", "+", ":", "<", ">", "?", "@", "^",
 	"_", "\\", "#", "{", "}"
 };
 // unshifted keys with standard positions
 SDL_Keycode keygrid[] = {
 	SDLK_QUOTE, SDLK_COMMA, SDLK_MINUS, SDLK_PERIOD, SDLK_SLASH,
+	SDLK_SEMICOLON, SDLK_EQUALS, SDLK_LEFTBRACKET, SDLK_RIGHTBRACKET,
+	SDLK_BACKQUOTE,
 	SDLK_0, SDLK_1, SDLK_2, SDLK_3, SDLK_4, SDLK_5, SDLK_6, SDLK_7,
-	SDLK_8, SDLK_9, SDLK_SEMICOLON, SDLK_EQUALS, SDLK_QUESTION,
+	SDLK_8, SDLK_9,
 	SDLK_a, SDLK_b, SDLK_c, SDLK_d, SDLK_e, SDLK_f, SDLK_g,
 	SDLK_h, SDLK_i, SDLK_j, SDLK_k, SDLK_l, SDLK_m, SDLK_n, SDLK_o,
 	SDLK_p, SDLK_q, SDLK_r, SDLK_s, SDLK_t, SDLK_u, SDLK_v, SDLK_w,
-	SDLK_x, SDLK_y, SDLK_z, SDLK_LEFTBRACKET, SDLK_RIGHTBRACKET,
-	SDLK_BACKQUOTE, SDLK_BACKSPACE, SDLK_RETURN, SDLK_LSHIFT, SDLK_LCTRL, SDLK_SPACE
+	SDLK_x, SDLK_y, SDLK_z,
+	SDLK_BACKSPACE, SDLK_RETURN, SDLK_LSHIFT, SDLK_LCTRL, SDLK_SPACE
 };
-#define SHIFTGRIDSIZE 20
-#define KEYGRIDSIZE 52
+#define SHIFTGRIDSIZE (sizeof(shiftkeygrid)/sizeof(char*))
+#define KEYGRIDSIZE (sizeof(keygrid)/sizeof(SDL_Keycode))
 
 bool keydown[SHIFTGRIDSIZE+KEYGRIDSIZE];
 
@@ -320,7 +324,7 @@ void handletextevent(SDL_TextInputEvent *e) {
 }
 
 int main(int argc, char **argv) {
-
+	DBGPRINTF("keygridsize = %d + %d = %d\n", SHIFTGRIDSIZE, KEYGRIDSIZE, SHIFTGRIDSIZE+KEYGRIDSIZE);
 	if (argc>1) initialise(argv[1]);
 	else initialise("a.o65");
 	reset6502();
