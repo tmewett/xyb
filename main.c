@@ -32,7 +32,12 @@
 #define CLAMP(x, xmin, xmax) MIN((xmax), MAX((x), (xmin)))
 #define MASKBIT(val, bit) ((val)>>(bit)&1)
 
+#ifdef DEBUG
+extern uint16_t pc, status;
 #define DBGPRINTF(s, ...) printf((s), __VA_ARGS__)
+#else
+#define DBGPRINTF(...)
+#endif
 
 uint8_t mem[1<<16];
 SDL_Window *Win;
@@ -192,6 +197,14 @@ uint8_t read6502(uint16_t addr) {
 }
 void write6502(uint16_t addr, uint8_t value) {
 	//~ printf("$%X = %X\n", addr, value);
+	#ifdef DEBUG
+	#define FLAGSTR(mask, s) (status & (mask) ? (s) : "-")
+	if (addr == 0xBEEF) {
+		printf("($%04X)  $%02X = %d  (%s)\n", pc, value, value,
+			FLAGSTR(0x01, "C"));
+	}
+	#undef FLAGSTR
+	#endif
 	int base = PERIPHSTART;
 	WRITEPERIPH(input, INPUTLEN);
 	WRITEPERIPH(timer, 2*TIMERLEN);

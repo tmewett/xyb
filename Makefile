@@ -8,7 +8,7 @@ DEPS := $(OBJS:.o=.d)
 INC_DIRS := .
 INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 
-CFLAGS := $(shell sdl2-config --cflags) -g
+CFLAGS := $(shell sdl2-config --cflags) -g -DDEBUG
 CPPFLAGS ?= $(INC_FLAGS) -MMD -MP
 LDLIBS := $(shell sdl2-config --libs)
 
