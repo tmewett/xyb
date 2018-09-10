@@ -91,14 +91,14 @@ bool keydown[KEYGRIDSIZE];
 	base += len;
 
 // mousereg - XYLMRCxx
-uint8_t _kbrow, _mousereg, _gotchar;
+uint8_t kbrow, inputreg, gotchar;
 uint8_t inputread(uint16_t reg) {
 	if (reg==0) {
-		return _kbrow;
+		return kbrow;
 	} else if (reg==1) {
 		uint8_t res = 0;
 		for (int i=0; i<8; i++) {
-			res |= keydown[_kbrow*8+i] << i;
+			res |= keydown[kbrow*8+i] << i;
 		}
 		return res;
 	} else if (reg==2) {
@@ -107,46 +107,46 @@ uint8_t inputread(uint16_t reg) {
 		if (state & SDL_BUTTON(SDL_BUTTON_LEFT)) buttons |= 1<<5;
 		if (state & SDL_BUTTON(SDL_BUTTON_MIDDLE)) buttons |= 1<<4;
 		if (state & SDL_BUTTON(SDL_BUTTON_RIGHT)) buttons |= 1<<3;
-		return _mousereg | buttons;
+		return inputreg | buttons;
 	} else if (reg==3) {
 		signed int x;
 		uint32_t state = SDL_GetMouseState(&x, NULL);
 		x /= SCALE;
 		x = CLAMP(x - TILEW*BORDERW, 0, SCREENW*TILEW-1);
-		if (_mousereg & 1<<7) x /= TILEW;
+		if (inputreg & 1<<7) x /= TILEW;
 		return x;
 	} else if (reg==4) {
 		signed int y;
 		uint32_t state = SDL_GetMouseState(NULL, &y);
 		y /= SCALE;
 		y = CLAMP(y - TILEH*BORDERW, 0, SCREENH*TILEH-1);
-		if (_mousereg & 1<<6) y /= TILEH;
+		if (inputreg & 1<<6) y /= TILEH;
 		return y;
 	} else if (reg==5) {
-		uint8_t c = _gotchar;
-		_gotchar = 0;
+		uint8_t c = gotchar;
+		gotchar = 0;
 		return c;
 	}
 }
 void inputwrite(uint16_t reg, uint8_t value) {
 	if (reg==0) {
-		_kbrow = value;
+		kbrow = value;
 	} else if (reg==2) {
-		_mousereg = value & ~0x38;
+		inputreg = value & ~0x38;
 	}
 }
 
 // ERIFxxxx
-uint8_t _timerreg[2];
-uint16_t _timerval[2];
-uint16_t _timerinit[2];
+uint8_t timerreg[2];
+uint16_t timerval[2];
+uint16_t timerinit[2];
 uint8_t timerread(uint16_t reg) {
 	int n = reg/3;
 	reg %= 3;
 	if (reg==0) {
-		return _timerreg[n];
+		return timerreg[n];
 	} else {
-		return (_timerval[n] >> 8*(reg-1)) & 0xFF;
+		return (timerval[n] >> 8*(reg-1)) & 0xFF;
 	}
 }
 void timerwrite(uint16_t reg, uint8_t value) {
@@ -154,40 +154,39 @@ void timerwrite(uint16_t reg, uint8_t value) {
 	reg %= 3;
 	if (reg==0) {
 		// is enable going 0 -> 1 ?
-		if (value & 0x80 && !(_timerreg[n] & 0x80)) lasttimer[n] = SDL_GetTicks();
-		_timerreg[n] = value;
+		if (value & 0x80 && !(timerreg[n] & 0x80)) lasttimer[n] = SDL_GetTicks();
+		timerreg[n] = value;
 	} else {
 		// unset enable
-		_timerreg[n] &= ~0x8F;
+		timerreg[n] &= ~0x8F;
 		// set appropriate byte (hacky)
-		_timerinit[n] &= 0xFF00 >> 8*(reg-1);
-		_timerinit[n] |= (uint16_t)value << 8*(reg-1);
-		_timerval[n] = _timerinit[n];
+		timerinit[n] &= 0xFF00 >> 8*(reg-1);
+		timerinit[n] |= (uint16_t)value << 8*(reg-1);
+		timerval[n] = timerinit[n];
 	}
 }
 int updatetimer(int n) {
 	int irq = 0;
-	if (!(_timerreg[n] & 0x80)) return 0; // skip if disabled
-	if (_timerval[n] == 1) { // about to hit zero?
-		_timerval[n] -= 1;
-		_timerreg[n] |= 0x10; // set flag
-		if (_timerreg[n] & 0x20) irq = true;
-		if (_timerreg[n] & 0x40) _timerval[n] = _timerinit[n]; // refill if set
-		else _timerreg[n] &= ~0x8F; // disable otherwise
+	if (!(timerreg[n] & 0x80)) return 0; // skip if disabled
+	if (timerval[n] == 1) { // about to hit zero?
+		timerval[n] -= 1;
+		timerreg[n] |= 0x10; // set flag
+		if (timerreg[n] & 0x20) irq = true;
+		if (timerreg[n] & 0x40) timerval[n] = timerinit[n]; // refill if set
+		else timerreg[n] &= ~0x8F; // disable otherwise
 	} else
-		_timerval[n] -= 1;
+		timerval[n] -= 1;
 	return irq;
 }
 
 
-uint8_t read6502(uint16_t addr) {
+uint8_t read8(uint16_t addr) {
 	int base = PERIPHSTART;
 	READPERIPH(input, INPUTLEN);
 	READPERIPH(timer, 2*TIMERLEN);
 	return mem[addr];
 }
-void write6502(uint16_t addr, uint8_t value) {
-	//~ printf("$%X = %X\n", addr, value);
+void write8(uint16_t addr, uint8_t value) {
 	#ifdef DEBUG
 	#define FLAGSTR(mask, s) (status & (mask) ? (s) : "-")
 	if (addr == 0xBEEF) {
@@ -226,7 +225,7 @@ int loadtomem(char *fname, uint16_t addr) {
 int loadchars(char *fname, uint16_t addr) {
 	FILE *f = fopen(fname, "r");
 	if (f==NULL) {
-		perror("loadtomem");
+		perror("loadchars");
 		exit(1);
 	}
 	for (int i=0;;i++) {
@@ -256,9 +255,10 @@ int initialise(char *romname) {
 }
 
 void drawglyph(uint8_t glyph, int x, int y) {
-	uint8_t colbyte = mem[SCREENSTART+768+y*SCREENW+x];
-	int fg = (colbyte >> 4) & 0xF;
-	int bg = colbyte & 0xF;
+	// upper 4 bits are index of foreground colour, lower 4 are background
+	uint8_t colour = mem[SCREENSTART+768+y*SCREENW+x];
+	int fg = (colour >> 4) & 0xF;
+	int bg = colour & 0xF;
 	fg *= 3; bg *= 3;
 	uint32_t *pixels = (uint32_t *)Screen->pixels;
 	for (int gy=0; gy<8; gy++) {
@@ -299,9 +299,9 @@ void handlekeyevent(SDL_KeyboardEvent *e) {
 	else if (code == SDLK_RSHIFT) code = SDLK_LSHIFT;
 
 	// send characters for backspace and line feed
-	if (e->type == SDL_KEYDOWN && (_mousereg & 0x04)) {
-		if (code == SDLK_RETURN) _gotchar = 8;
-		else if (code == SDLK_BACKSPACE) _gotchar = 10;
+	if (e->type == SDL_KEYDOWN && (inputreg & 0x04)) {
+		if (code == SDLK_RETURN) gotchar = 8;
+		else if (code == SDLK_BACKSPACE) gotchar = 10;
 	}
 
 	for (int i=0; i < KEYGRIDSIZE; i++) {
@@ -316,8 +316,9 @@ void handlekeyevent(SDL_KeyboardEvent *e) {
 
 void handletextevent(SDL_TextInputEvent *e) {
 	char c = e->text[0];
-	if (_mousereg & 0x04 && c >= 8) {
-		_gotchar = c;
+	// got events with c=5 while testing, don't know why.
+	if (inputreg & 0x04 && c >= 8) {
+		gotchar = c;
 	}
 }
 
@@ -333,16 +334,18 @@ int main(int argc, char **argv) {
 	uint64_t countfreq = SDL_GetPerformanceFrequency();
 	total = SDL_GetPerformanceCounter()-total;
 	printf("Averaged %f MHz CPU, %f FPS\n", \
-		1.0/((float)(total)/clockticks6502/countfreq*CPUFREQ), \
-		 (float)countfreq*frames/total);
+		(float)clockticks6502/(total/countfreq*1000000), \
+		(float)countfreq*frames/total);
 	SDL_Quit();
 	return 0;
 }
 
 int handleevents() {
 	static uint64_t last, overcount;
-	uint64_t countfreq = SDL_GetPerformanceFrequency();
-	uint64_t clumpcount = countfreq / CPUFREQ * CLUMPSIZE;
+	uint64_t countfreq = SDL_GetPerformanceFrequency(),
+		// how many perf ticks per clump
+		clumpcount = countfreq / CPUFREQ * CLUMPSIZE,
+		count, extra;
 
 	SDL_Event e;
 	SDL_PollEvent(&e);
@@ -354,14 +357,17 @@ int handleevents() {
 		handletextevent(&e.text);
 	}
 
-	uint64_t count = SDL_GetPerformanceCounter() - last;
+	count = SDL_GetPerformanceCounter() - last;
 
 	if (last != 0) { // don't sleep on first invocation
 		if (count <= clumpcount) {
-			uint64_t extra = MIN(overcount, clumpcount-count);
+			// We finished too early, so sleep. But adjust our sleep time down to
+			// account for any "debt" from previous late finishes
+			extra = MIN(overcount, clumpcount-count);
 			overcount -= extra;
-			SDL_Delay(1000*(clumpcount-(count+extra))/countfreq);
+			SDL_Delay(1000*(clumpcount-count-extra)/countfreq);
 		} else {
+			// We finished too late, so record how much by
 			overcount += count - clumpcount;
 		}
 	}
