@@ -20,7 +20,7 @@
 #define SCALE 3
 
 #define PERIPHSTART 0x0200
-#define INPUTLEN 5
+#define INPUTLEN 6
 #define TIMERLEN 3
 
 #define ROMSTART 0xE000
@@ -62,22 +62,10 @@ uint8_t palette[] = { // pico-8's colours
 	0x2c, 0xab, 0xfe
 };
 
-// for convenience, the grid should be ordered into uncased, cased, and non-printing regions
-// TODO tidy this up
-// all keys whose locations we don't know for certain are handled by TextInputEvents
-char *shiftkeygrid[] = {
-	//~ ! \" ~ $ % & (
-	//~ ) * + : < > ? @ ^
-	//~ _ \\ # { }
-	"!", "\"", "~", "$", "%", "&", "(",
-	")", "*", "+", ":", "<", ">", "?", "@", "^",
-	"_", "\\", "#", "{", "}"
-};
-// unshifted keys with standard positions
 SDL_Keycode keygrid[] = {
 	SDLK_QUOTE, SDLK_COMMA, SDLK_MINUS, SDLK_PERIOD, SDLK_SLASH,
 	SDLK_SEMICOLON, SDLK_EQUALS, SDLK_LEFTBRACKET, SDLK_RIGHTBRACKET,
-	SDLK_BACKQUOTE,
+	SDLK_BACKSLASH, SDLK_BACKQUOTE,
 	SDLK_0, SDLK_1, SDLK_2, SDLK_3, SDLK_4, SDLK_5, SDLK_6, SDLK_7,
 	SDLK_8, SDLK_9,
 	SDLK_a, SDLK_b, SDLK_c, SDLK_d, SDLK_e, SDLK_f, SDLK_g,
@@ -86,10 +74,9 @@ SDL_Keycode keygrid[] = {
 	SDLK_x, SDLK_y, SDLK_z,
 	SDLK_BACKSPACE, SDLK_RETURN, SDLK_LSHIFT, SDLK_LCTRL, SDLK_SPACE
 };
-#define SHIFTGRIDSIZE (sizeof(shiftkeygrid)/sizeof(char*))
 #define KEYGRIDSIZE (sizeof(keygrid)/sizeof(SDL_Keycode))
 
-bool keydown[SHIFTGRIDSIZE+KEYGRIDSIZE];
+bool keydown[KEYGRIDSIZE];
 
 #define READPERIPH(peri, len) \
 	if (addr >= base && addr <= base+len) {\
@@ -103,8 +90,8 @@ bool keydown[SHIFTGRIDSIZE+KEYGRIDSIZE];
 	}\
 	base += len;
 
-// mousereg - XYLMRxxx
-uint8_t _kbrow, _mousereg;
+// mousereg - XYLMRCxx
+uint8_t _kbrow, _mousereg, _gotchar;
 uint8_t inputread(uint16_t reg) {
 	if (reg==0) {
 		return _kbrow;
@@ -133,15 +120,19 @@ uint8_t inputread(uint16_t reg) {
 		uint32_t state = SDL_GetMouseState(NULL, &y);
 		y /= SCALE;
 		y = CLAMP(y - TILEH*BORDERW, 0, SCREENH*TILEH-1);
-		if (_mousereg & 1<<7) y /= TILEH;
+		if (_mousereg & 1<<6) y /= TILEH;
 		return y;
+	} else if (reg==5) {
+		uint8_t c = _gotchar;
+		_gotchar = 0;
+		return c;
 	}
 }
 void inputwrite(uint16_t reg, uint8_t value) {
 	if (reg==0) {
 		_kbrow = value;
 	} else if (reg==2) {
-		_mousereg = value & 0xC0;
+		_mousereg = value & ~0x38;
 	}
 }
 
@@ -303,41 +294,35 @@ void drawscreen() {
 void handlekeyevent(SDL_KeyboardEvent *e) {
 	SDL_Keycode code = e->keysym.sym;
 
-	// release all shifted keys on ANY keyup
-	if (e->type == SDL_KEYUP) {
-		for (int i=0; i < SHIFTGRIDSIZE; i++) {
-			if (keydown[i]) DBGPRINTF("%s up\n", shiftkeygrid[i]);
-			keydown[i] = false;
-		}
-	}
-
 	// don't distinguish either ctrl or shift keys
 	if (code == SDLK_RCTRL) code = SDLK_LCTRL;
 	else if (code == SDLK_RSHIFT) code = SDLK_LSHIFT;
 
+	// send characters for backspace and line feed
+	if (e->type == SDL_KEYDOWN && (_mousereg & 0x04)) {
+		if (code == SDLK_RETURN) _gotchar = 8;
+		else if (code == SDLK_BACKSPACE) _gotchar = 10;
+	}
+
 	for (int i=0; i < KEYGRIDSIZE; i++) {
 		if (keygrid[i] == code) {
-			if (e->type == SDL_KEYUP && keydown[SHIFTGRIDSIZE+i] || e->type == SDL_KEYDOWN)
+			if (e->type == SDL_KEYUP && keydown[i] || e->type == SDL_KEYDOWN)
 				DBGPRINTF("%s %s\n", SDL_GetKeyName(keygrid[i]), e->type == SDL_KEYDOWN ? "down" : "up");
-			keydown[SHIFTGRIDSIZE+i] = e->type == SDL_KEYDOWN;
+			keydown[i] = e->type == SDL_KEYDOWN;
 			break;
 		}
 	}
 }
 
 void handletextevent(SDL_TextInputEvent *e) {
-	char *text = e->text;
-	for (int i=0; i < SHIFTGRIDSIZE; i++) {
-		if (strcmp(text, shiftkeygrid[i]) == 0) {
-			keydown[i] = true;
-			DBGPRINTF("%s down\n", shiftkeygrid[i]);
-			break;
-		}
+	char c = e->text[0];
+	if (_mousereg & 0x04 && c >= 8) {
+		_gotchar = c;
 	}
 }
 
 int main(int argc, char **argv) {
-	DBGPRINTF("keygridsize = %d + %d = %d\n", SHIFTGRIDSIZE, KEYGRIDSIZE, SHIFTGRIDSIZE+KEYGRIDSIZE);
+	DBGPRINTF("keygridsize = %d\n", KEYGRIDSIZE);
 	if (argc>1) initialise(argv[1]);
 	else initialise("a.o65");
 	reset6502();
@@ -363,7 +348,7 @@ int handleevents() {
 	SDL_PollEvent(&e);
 	if (e.type == SDL_QUIT) {
 		return 1;
-	} else if ((e.type == SDL_KEYDOWN || e.type == SDL_KEYUP) && !e.key.repeat) {
+	} else if (e.type == SDL_KEYDOWN || e.type == SDL_KEYUP) {
 		handlekeyevent(&e.key);
 	} else if (e.type == SDL_TEXTINPUT) {
 		handletextevent(&e.text);
