@@ -15,8 +15,8 @@ LDLIBS := $(shell sdl2-config --libs)
 $(TARGET): $(OBJS)
 	$(CC) $(LDFLAGS) $(OBJS) -o $@ $(LOADLIBES) $(LDLIBS)
 
-%.o65: %.asm
-	xa -bt 57344 $< -o $@
+%: %.asm
+	cl65 -t none --start-addr 0xE000 -o $@ $<
 
 chars.gray: codepage.png
 	convert $< -depth 1 $@
