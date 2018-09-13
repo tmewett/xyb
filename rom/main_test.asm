@@ -1,6 +1,6 @@
 .include "common.inc"
 
-jmp drawct
+jmp putct
 
 .proc drawct
 loop:
@@ -16,5 +16,12 @@ loop:
 	lda #0
 	sta TERMCURSX
 	sta TERMCURSY
+	jmp loop
+.endproc
+
+.proc putct
+loop:
+	jsr putc
+	iny
 	jmp loop
 .endproc

@@ -1,16 +1,19 @@
 INPUTSTART = $0200
 SCREENSTART = $D000
+SCREENW = 32
+SCREENH = 24
 TERMCURSX = $FF
 TERMCURSY = $FE
 
 .macro memcpy dest, src, len ; AX
-.proc
-loop:
+.scope
+	sec
 	ldx #0
+loop:
 	lda src,X
 	sta dest,X
+	cpx #len-1
 	inx
-	cpx #len
-	bne loop
-.endproc
+	bcc loop
+.endscope
 .endmacro

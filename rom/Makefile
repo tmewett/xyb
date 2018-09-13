@@ -6,5 +6,5 @@ OBJS := $(addsuffix .o,$(basename $(ASMS)))
 rom: $(OBJS)
 	cl65 -t none --start-addr 0xE000 -o rom $^
 
-%.o: %.asm
+%.o: %.asm common.inc
 	ca65 -t none --auto-import -o $@ $<
