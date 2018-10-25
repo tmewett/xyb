@@ -322,6 +322,7 @@ void handletextevent(SDL_TextInputEvent *e) {
 	}
 }
 
+uint64_t asleep;
 int main(int argc, char **argv) {
 	DBGPRINTF("keygridsize = %d\n", KEYGRIDSIZE);
 	if (argc>1) initialise(argv[1]);
@@ -336,6 +337,7 @@ int main(int argc, char **argv) {
 	printf("Averaged %f MHz CPU, %f FPS\n", \
 		(float)clockticks6502/(total/countfreq*1000000), \
 		(float)countfreq*frames/total);
+	printf("Spent %.3f%% of running time asleep\n", (float)asleep/total*100);
 	SDL_Quit();
 	return 0;
 }
@@ -366,6 +368,7 @@ int handleevents() {
 			extra = MIN(overcount, clumpcount-count);
 			overcount -= extra;
 			SDL_Delay(1000*(clumpcount-count-extra)/countfreq);
+			asleep += clumpcount-count-extra;
 		} else {
 			// We finished too late, so record how much by
 			overcount += count - clumpcount;
