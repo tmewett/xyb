@@ -3,11 +3,14 @@
 jmp putct
 
 .proc drawct
+	ldy #0
 loop:
-	jsr drawc
 	inc TERMCURSX
 	inc TERMCURSY
-	iny
+	jsr updatecurs
+	lda $00
+	sta (SCREENPTR),Y
+	inc $00
 
 	lda TERMCURSY
 	cmp #24
@@ -20,8 +23,11 @@ loop:
 .endproc
 
 .proc putct
+	ldy #0
 loop:
+	lda $beef
+	sta (COLOURPTR),Y
+	tay
 	jsr putc
-	iny
 	jmp loop
 .endproc
