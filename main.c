@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
+#include <time.h>
 #include <errno.h>
 
 #include <SDL.h>
@@ -181,6 +182,11 @@ int updatetimer(int n) {
 
 
 uint8_t read8(uint16_t addr) {
+	#ifdef DEBUG
+	if (addr == 0xBEEF) {
+		return rand() % 256;
+	}
+	#endif
 	int base = PERIPHSTART;
 	READPERIPH(input, INPUTLEN);
 	READPERIPH(timer, 2*TIMERLEN);
@@ -240,6 +246,7 @@ int loadchars(char *fname, uint16_t addr) {
 }
 
 int initialise(char *romname) {
+	srand(time(NULL));
 	write16(0xFFFC, ROMSTART); // set initial pc
 	write16(0xFFFE, ROMSTART); // for now, restart on IRQ
 
