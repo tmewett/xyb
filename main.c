@@ -250,6 +250,7 @@ int initialise() {
 
 	loadchars("chars.gray", CHARSSTART);
 	loadtomem("rom/rom1", ROMSTART);
+	loadtomem("rom/rom2", ROMSTART+0x1000);
 
 	write16(0xFFFC, ROMSTART); // set initial pc
 	write16(0xFFFE, ROMSTART); // for now, restart on IRQ
