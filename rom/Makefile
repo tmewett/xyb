@@ -3,8 +3,10 @@ MAIN := main_test.asm
 ASMS := $(MAIN) $(shell find -iname '*.asm' ! -iname 'main*')
 OBJS := $(addsuffix .o,$(basename $(ASMS)))
 
-rom: $(OBJS)
-	cl65 -t none --start-addr 0xE000 -o rom $^
+all: rom1
+
+rom1: $(OBJS)
+	ld65 -t none --start-addr 0xE000 -o $@ $^
 
 %.o: %.asm common.inc
 	ca65 -t none --auto-import -o $@ $<

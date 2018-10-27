@@ -245,14 +245,15 @@ int loadchars(char *fname, uint16_t addr) {
 	fclose(f);
 }
 
-int initialise(char *romname) {
+int initialise() {
 	srand(time(NULL));
-	write16(0xFFFC, ROMSTART); // set initial pc
-	write16(0xFFFE, ROMSTART); // for now, restart on IRQ
 
 	loadchars("chars.gray", CHARSSTART);
-	loadtomem(romname, ROMSTART);
-	memset(&mem[SCREENSTART+768], 0x60, 768);
+	loadtomem("rom/rom1", ROMSTART);
+
+	write16(0xFFFC, ROMSTART); // set initial pc
+	write16(0xFFFE, ROMSTART); // for now, restart on IRQ
+	memset(&mem[SCREENSTART+768], 0x40, 768);
 
 	SDL_Init(SDL_INIT_VIDEO);
 	Win = SDL_CreateWindow("XY Brewer", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, \
@@ -332,8 +333,7 @@ void handletextevent(SDL_TextInputEvent *e) {
 uint64_t asleep;
 int main(int argc, char **argv) {
 	DBGPRINTF("keygridsize = %d\n", KEYGRIDSIZE);
-	if (argc>1) initialise(argv[1]);
-	else initialise("a.o65");
+	initialise();
 	reset6502();
 	uint64_t total = SDL_GetPerformanceCounter();
 
