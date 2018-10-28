@@ -128,18 +128,39 @@ routine (exit)
 	img-prevword @
 
 	begin \ addr u word-addr
-		dup 0= if 2drop drop 0 exit then \ fail if lastword is null
 		image-target - image + \ convert from eventual addr to current
 		dup >r  count
 		2over compare 0= if
 			2drop r> >xt exit \ give xt
 			then
-	r> prev-word again
+	r> prev-word  dup 0= until \ loop again unless no more words
 	;
+
+
+( We can now start to define the compilation model )
+
+\ run-time code for colon definitions
+routine (colon)
+	\ TODO
+
+: icompile ( xt -- )  i, ;
+
+\ a simple routine to compile to the image
+\ TODO literals
+: i:
+	icreate  (colon) i,
+	begin \ keep reading and compiling words until we see i;
+		bl word count \ addr u
+		2dup s" i;" compare 0<> while
+		2dup ifind
+			dup if icompile 2drop
+			else ." undefined word " type quit then
+	repeat
+	exit, ;
+
 
 include tests.fth
 
-image 256 dump
 s" rom2" save-image
 
 bye
