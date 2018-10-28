@@ -104,17 +104,17 @@ routine (machine)
 
 \ begin sub-execution of a word with the given codeptr; the JSR of Forth words
 routine (execute) \ XA=xt Y01
-	\ ~ \ put bodyptr on return stack
-	\ ~ bodyptr 1+ lda0
-	\ ~ pha
-	\ ~ bodyptr lda0
-	\ ~ pha
 	\ store xt
 	$00 stx0
 	$01 sta0
-	\ load bodyptr [xt + 2]
+	\ put bodyptr on return stack
+	bodyptr 1+ lda0
+	pha
+	bodyptr lda0
+	pha
+	\ load xt+2 into bodyptr
 	clc
-	txa
+	$00 lda0
 	2 adc#
 	bodyptr sta0
 	$01 lda0
@@ -127,14 +127,12 @@ routine (execute) \ XA=xt Y01
 
 \ the RTS of Forth words
 routine (exit)
-	\ ~ \ restore bodyptr from return stack
-	\ ~ pla
-	\ ~ bodyptr sta0
-	\ ~ pla
-	\ ~ bodyptr 1+ sta0
-	\ this routine must be called by jmp, so this rts goes up a level
+	\ restore bodyptr from return stack
+	pla
+	bodyptr sta0
+	pla
+	bodyptr 1+ sta0
 	rts
-
 
 : primitive  icreate  (machine) i, ;
 : exit,  (exit) jmp, ;
