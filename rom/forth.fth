@@ -135,8 +135,14 @@ routine (exit)
 	rts
 
 : primitive  icreate  (machine) i, ;
-: exit,  (exit) jmp, ;
 
+primitive exit
+	\ destroy 1 stack frame, from the (execute) which called us
+	pla
+	pla
+	pla
+	pla
+	(exit) jmp,
 
 : ifind ( addr u -- xt | 0 )
 	img-prevword @
@@ -155,9 +161,27 @@ routine (exit)
 
 \ run-time code for colon definitions
 routine (colon)
-	\ TODO
+	\ load bodyptr into 01 while incrementing it by 2
+	clc
+	bodyptr lda0
+	$00 sta0
+	2 adc#
+	bodyptr sta0
+	bodyptr 1+ lda0
+	$01 sta0
+	0 adc#
+	bodyptr 1+ sta0
+	\ deref and execute
+	(@) jsr,
+	$02 ldx0
+	$03 lda0
+	(execute) jsr,
+	\ repeat unconditionally; EXIT will return to caller
+	(colon) jmp,
+
 
 : icompile ( xt -- )  i, ;
+: exit,  s" exit" ifind icompile ;
 
 \ a simple routine to compile to the image
 \ TODO literals
