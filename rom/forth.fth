@@ -8,16 +8,24 @@
 	the image for eventual live use.
 )
 
-( Image and dictionary building )
+( Terminology:
+	host - whatever is running this file
+	image - the interpreter we are building
+	target - whatever will run the image
+	image address - address in the host of a location in the image
+	target address - address to be used by the target
+)
+
+	( Image and dictionary building )
 
 create image $1000 allot
-variable idp  0 idp ! \ image data pointer
+variable idp  0 idp ! \ image data pointer; offset from image start
 $F000 constant image-target
 
-: >addr ( image-addr -- eventual-addr )  image - image-target + ;
+: >target ( i-addr -- t-addr )  image - image-target + ;
 : >le ( u -- hi lo )  dup 8 rshift  swap $FF and ; \ to little-endian byte pair
 : le> ( hi lo -- u )  swap 8 lshift  or ;
-: le@ ( addr -- hi lo )  dup char+ c@ swap c@  le> ;
+: le@ ( i-addr -- hi lo )  dup char+ c@ swap c@  le> ;
 
 ( for manipulating image contents. all addresses relative to start of image )
 : ihere  idp @ ;
@@ -55,13 +63,10 @@ variable img-prevword  0 img-prevword !
 
 : prev-word ( w -- w->next )  count + le@ ;
 \ in this impl, an xt is a pointer to a word's code pointer
-: >xt ( w -- xt )  count + 2 + >addr ;
+: >xt ( w -- xt )  count + 2 + >target ;
 
 
-( Essential variables and primitives )
-
-$D2 constant bodyptr \ addr of last executed word's data part
-
+\ A simple postfix assembler
 ( [arg] opcode -- )
 : asm-arg-none  ic, ;
 : asm-arg-byte  ic, ic, ;
@@ -69,11 +74,18 @@ $D2 constant bodyptr \ addr of last executed word's data part
 : asm-arg-relative  ic,  there - 1+  ic, ;
 include assembler.fth
 
+
+	( Live-use variables )
+
+$D2 constant bodyptr \ addr of last executed word's data part
+
+
+	( Execution )
+
 : routine  there constant ;
 
 \ leave enough room for a jmp to be filled in
 3 idp +!
-
 
 routine (@)
 	0 ldy#
@@ -124,7 +136,6 @@ routine (exit)
 	rts
 
 
-
 : primitive  icreate  (machine) i, ;
 : exit,  (exit) jmp, ;
 
@@ -142,7 +153,7 @@ routine (exit)
 	;
 
 
-( We can now start to define the compilation model )
+	( Compilation )
 
 \ run-time code for colon definitions
 routine (colon)
