@@ -74,6 +74,18 @@ include assembler.fth
 \ leave enough room for a jmp to be filled in
 3 idp +!
 
+
+routine (@)
+	0 ldy#
+	$00 lda(),y
+	$02 sta0
+	$00 inc0
+	there 2 + bne, \ skip next inc if no wrap
+	$01 inc0
+	$00 lda(),y
+	$03 sta0
+	rts
+
 \ run-time code for words where the body is just machine code
 routine (machine)
 	bodyptr jmp()
@@ -97,14 +109,7 @@ routine (execute) \ XA=xt Y01
 	0 adc#
 	bodyptr 1+ sta0
 	\ dereference xt
-	0 ldy#
-	$00 lda(),y
-	$02 sta0
-	$00 inc0
-	there 2 + bne, \ skip next inc if no wrap
-	$01 inc0
-	$00 lda(),y
-	$03 sta0
+	(@) jsr,
 	\ do code; indirect jmp to code pointer
 	$0002 jmp()
 
