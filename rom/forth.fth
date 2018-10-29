@@ -77,6 +77,7 @@ include assembler.fth
 
 	( Live-use variables )
 
+$D0 constant sp \ stack pointer
 $D2 constant bodyptr \ addr of last executed word's data part
 
 
@@ -151,11 +152,11 @@ primitive exit
 
 	begin \ addr u word-addr
 		image-target - image + \ convert from eventual addr to current
-		dup >r  count
-		2over compare 0= if
-			2drop r> >xt exit \ give xt
-			then
-	r> prev-word  dup 0= until \ loop again unless no more words
+		dup >r  count \ a1 u1 a2 u2
+		2over compare 0= if \ have we found the word?
+			2drop r> >xt exit then \ then give xt and exit
+	r> prev-word  dup 0= until \ otherwise loop again, unless no more words
+	2drop drop 0
 	;
 
 
@@ -182,19 +183,52 @@ routine (colon)
 : icompile ( xt -- )  i, ;
 : exit,  s" exit" ifind icompile ;
 
+routine push \ A=hi X=lo Y
+	\ stack grows down in memory, low byte mem-below high
+	0 ldy#
+	sp sta(),y
+	sp dec0
+	txa
+	sp sta(),y
+	sp dec0
+	rts
+
+\ pop bodyptr from return stack; push *bodyptr to stack; push bodyptr+2 to return stack
+primitive (literal)
+	clc
+	pla
+	$00 sta0
+	2 adc#
+	tax
+	pla
+	$01 sta0
+	0 adc#
+	pha
+	txa
+	pha
+
+	(@) jsr,
+	push jsr,
+	(exit) jmp,
+
+: iliteral  s" (literal)" ifind icompile  i, ;
+: try>number ( c-addr u -- [u] f )
+	\ if f is true, u is the given string as a number
+	0 0 2swap  >number nip  0= dup if nip else nip nip then ;
+
 \ a simple routine to compile to the image
-\ TODO literals
 : i:
 	icreate  (colon) i,
 	begin \ keep reading and compiling words until we see i;
 		bl word count \ addr u
 		2dup s" i;" compare 0<> while
-		2dup ifind
+		2dup ifind \ addr u xt
 			dup if icompile 2drop
-			else ." undefined word " type quit then
+			else drop try>number if iliteral then
+		then
 	repeat
+	2drop
 	exit, ;
-
 
 include tests.fth
 

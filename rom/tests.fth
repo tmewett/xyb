@@ -15,6 +15,7 @@ primitive c3!
 	(exit) jmp,
 
 i: w1  a5! c3! i;
+i: w2  255 i;
 
 routine exectest
 	s" beef" ifind  >le ldx# lda#
@@ -28,4 +29,5 @@ routine exittest
 \ put a jump to our chosen test at the top of the image
 0 idp !  exittest jmp,
 
+~~
 image 256 dump
