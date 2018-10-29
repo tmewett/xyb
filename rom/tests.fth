@@ -3,21 +3,25 @@ primitive beef
 	$5A lda#
 	$beef sta,
 	jmp,
-exit,
 
-primitive beef1
+primitive a5!
 	$A5 lda#
 	$beef sta,
-exit,
+	(exit) jmp,
 
-i: compiled  beef1 i;
+primitive c3!
+	$C3 lda#
+	$beef sta,
+	(exit) jmp,
+
+i: w1  a5! c3! i;
 
 routine exectest
 	s" beef" ifind  >le ldx# lda#
 	(execute) jsr,
 
 routine exittest
-	s" compiled" ifind  >le ldx# lda#
+	s" w1" ifind  >le ldx# lda#
 	(execute) jsr,
 	exittest jmp,
 
