@@ -87,15 +87,15 @@ $D2 constant bodyptr \ addr of last executed word's data part
 \ leave enough room for a jmp to be filled in
 3 idp +!
 
+\ dereferences the addr in 01 into XA
 routine (@)
 	0 ldy#
 	$00 lda(),y
-	$02 sta0
+	tax
 	$00 inc0
 	there 2 + bne, \ skip next inc if no wrap
 	$01 inc0
 	$00 lda(),y
-	$03 sta0
 	rts
 
 \ run-time code for words where the body is just machine code
@@ -123,7 +123,9 @@ routine (execute) \ XA=xt Y01
 	\ dereference xt
 	(@) jsr,
 	\ do code; indirect jmp to code pointer
-	$0002 jmp()
+	$00 stx0
+	$01 sta0
+	$0000 jmp()
 
 \ the RTS of Forth words
 routine (exit)
@@ -173,12 +175,9 @@ routine (colon)
 	bodyptr 1+ sta0
 	\ deref and execute
 	(@) jsr,
-	$02 ldx0
-	$03 lda0
 	(execute) jsr,
 	\ repeat unconditionally; EXIT will return to caller
 	(colon) jmp,
-
 
 : icompile ( xt -- )  i, ;
 : exit,  s" exit" ifind icompile ;
