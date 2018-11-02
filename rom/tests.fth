@@ -14,29 +14,29 @@ primitive c3!
 	$beef sta,
 	(exit) jmp,
 
-i: w1  a5! c3! i;
-i: w2  254 48879 c! i;
+i: simple  a5! c3! i;
+i: store  254 48879 c! i;
 
-routine exectest
-	s" beef" ifind  >le ldx# lda#
+routine primtest
+	i' beef  >le ldx# lda#
 	(execute) jsr,
 
-routine exittest
-	s" w1" ifind  >le ldx# lda#
-	(execute) jsr,
-	exittest jmp,
-
-routine store
+routine wordtest
+	\ initialise stack pointer
 	$FF lda#
 	sp sta0
 	$04 lda#
 	sp 1+ sta0
-	s" w2" ifind  >le ldx# lda#
+
+	\ choose the word
+	i' store
+
+	>le ldx# lda#
 	(execute) jsr,
-	store jmp,
+	wordtest jmp,
 
 \ put a jump to our chosen test at the top of the image
-0 idp !  store jmp,
+0 idp !  wordtest jmp,
 
 ~~
 image 256 dump

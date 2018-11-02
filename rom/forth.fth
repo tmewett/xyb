@@ -159,6 +159,9 @@ primitive exit
 	2drop drop 0
 	;
 
+: i'  bl word count  ifind ;
+: [i']  i'  postpone literal ; immediate
+
 
 	( Compilation )
 
@@ -180,8 +183,7 @@ routine (colon)
 	\ repeat unconditionally; EXIT will return to caller
 	(colon) jmp,
 
-: icompile ( xt -- )  i, ;
-: exit,  s" exit" ifind icompile ;
+: icompile, ( xt -- )  i, ;
 
 routine push \ A=hi X=lo Y
 	\ stack grows down in memory, low byte mem-below high
@@ -220,7 +222,7 @@ primitive (literal)
 	push jsr,
 	(exit) jmp,
 
-: iliteral  s" (literal)" ifind icompile  i, ;
+: iliteral  [i'] (literal) icompile,  i, ;
 : try>number ( c-addr u -- [u] f )
 	\ if f is true, u is the given string as a number
 	0 0 2swap  >number nip  0= dup if nip else nip nip then ;
@@ -232,12 +234,12 @@ primitive (literal)
 		bl word count \ addr u
 		2dup s" i;" compare 0<> while
 		2dup ifind \ addr u xt
-			dup if icompile 2drop
+			dup if icompile, 2drop
 			else drop try>number if iliteral then
 		then
 	repeat
 	2drop
-	exit, ;
+	[i'] exit icompile, ;
 
 primitive c! ( val addr -- )
 	pop jsr,
