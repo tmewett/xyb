@@ -434,11 +434,25 @@ static void bpl() {
 }
 
 static void brk() {
+#ifdef DEBUG
+    printf("(%04X)  A = %02X  X = %02X  Y = %02X  SP = %02X\n", pc, a, x, y, sp);
+
+    char str[8];
+    uint16_t addr;
+    while (1) {
+        if (fgets(str, 8, stdin) == NULL) break;
+        if (sscanf(str, "%x", &addr) < 0) break;
+        printf("%04X:  ", addr);
+        for (int i=0; i<16; i++) printf("%02X ", read8(addr++));
+        printf("\n");
+    }
+#else
     pc++;
     push16(pc); //push next instruction address onto stack
     push8(status | FLAG_BREAK); //push CPU status to stack
     setinterrupt(); //set interrupt flag
     pc = (uint16_t)read6502(0xFFFE) | ((uint16_t)read6502(0xFFFF) << 8);
+#endif
 }
 
 static void bvc() {

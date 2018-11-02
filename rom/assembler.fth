@@ -30,6 +30,7 @@
 : bmi, $30 asm-arg-relative ;
 : bne, $D0 asm-arg-relative ;
 : bpl, $10 asm-arg-relative ;
+: brk $00 asm-arg-none ;
 : bvc, $50 asm-arg-relative ;
 : bvs, $70 asm-arg-relative ;
 : clc $18 asm-arg-none ;
