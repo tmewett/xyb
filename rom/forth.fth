@@ -193,6 +193,15 @@ routine push \ A=hi X=lo Y
 	sp dec0
 	rts
 
+routine pop \ puts A=hi X=lo Y
+	0 ldy#
+	sp inc0
+	sp lda(),y
+	tax
+	sp inc0
+	sp lda(),y
+	rts
+
 \ pop bodyptr from return stack; push *bodyptr to stack; push bodyptr+2 to return stack
 primitive (literal)
 	clc
@@ -229,6 +238,15 @@ primitive (literal)
 	repeat
 	2drop
 	exit, ;
+
+primitive c! ( val addr -- )
+	pop jsr,
+	$00 stx0
+	$01 sta0
+	pop jsr,
+	txa
+	$00 sta(),y
+	(exit) jmp,
 
 include tests.fth
 
