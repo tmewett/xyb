@@ -79,6 +79,7 @@ include assembler.fth
 
 $D0 constant sp \ stack pointer
 $D2 constant bodyptr \ addr of last executed word's data part
+$D4 constant temp
 
 
 	( Execution )
@@ -250,6 +251,57 @@ primitive c! ( val addr -- )
 	$00 sta(),y
 	(exit) jmp,
 
+primitive c@ ( addr -- val )
+	pop jsr,
+	$00 stx0
+	$01 sta0
+	$00 lda(),y
+	tax
+	0 lda#
+	push jsr,
+	(exit) jmp,
+
+primitive + ( x y -- x+y )
+	clc
+
+	sp inc0
+	0 ldy#
+	sp lda(),y
+	2 ldy#
+	sp adc(),y
+	php \ save carry
+	sp sta(),y
+
+	sp inc0
+	0 ldy#
+	sp lda(),y
+	2 ldy#
+	plp \ restore carry
+	sp adc(),y
+	sp sta(),y
+
+	(exit) jmp,
+
+primitive nand ( x y -- ~(x&y) )
+	pop jsr,
+	\ high byte
+	2 ldy#
+	sp and(),y
+	$FF eor#
+	sp sta(),y
+	\ now low
+	dey
+	txa
+	sp and(),y
+	$FF eor#
+	sp sta(),y
+	(exit) jmp,
+
+\ temporary variable in 222 = $DE
+i: t!  222 ! i;
+i: t@  222 @ i;
+
+include words.fth
 include tests.fth
 
 s" rom2" save-image

@@ -15,7 +15,8 @@ primitive c3!
 	(exit) jmp,
 
 i: simple  a5! c3! i;
-i: store  254 48879 c! i;
+i: fetch-store  48879 c@ 48879 c! i;
+i: arith  250 100 + 150 - 48879 c! i;
 
 routine primtest
 	i' beef  >le ldx# lda#
@@ -29,7 +30,7 @@ routine wordtest
 	sp 1+ sta0
 
 	\ choose the word
-	i' store
+	i' arith
 
 	>le ldx# lda#
 	(execute) jsr,

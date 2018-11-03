@@ -8,7 +8,7 @@ all: rom1 rom2
 rom1: $(OBJS)
 	ld65 -t none --start-addr 0xE000 -o $@ $^
 
-rom2: forth.fth assembler.fth tests.fth
+rom2: forth.fth assembler.fth tests.fth words.fth
 	gforth $<
 
 %.o: %.asm common.inc
