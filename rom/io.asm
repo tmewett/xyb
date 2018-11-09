@@ -1,9 +1,8 @@
 .include "common.inc"
 
-.proc putc ; AX Y=char
-	cpy #8
+.proc putchar ; A=char XY
+	cmp #8
 	beq newline
-	tya
 	ldy #0
 	sta (SCREENPTR),Y
 	lda TERMCURSX
@@ -34,7 +33,7 @@ nocolour:
 	sta TERMCURSX
 	jmp updatecurs
 .endproc
-.export putc
+.export putchar
 
 ; update the cursor pointers from the cursor X,Y coords
 .proc updatecurs ; AX
