@@ -261,6 +261,29 @@ primitive c@ ( addr -- val )
 	push jsr,
 	(exit) jmp,
 
+primitive !
+	pop jsr,
+	$00 stx0
+	$01 sta0
+	pop jsr,
+	pha
+	txa
+	$00 sta(),y
+	$00 inc0
+	there 2 + bne, \ skip next inc if no wrap
+	$01 inc0
+	pla
+	$00 sta(),y
+	(exit) jmp,
+
+primitive @
+	pop jsr,
+	$00 stx0
+	$01 sta0
+	(@) jsr,
+	push jsr,
+	(exit) jmp,
+
 primitive + ( x y -- x+y )
 	clc
 

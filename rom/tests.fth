@@ -15,7 +15,8 @@ primitive c3!
 	(exit) jmp,
 
 i: simple  a5! c3! i;
-i: fetch-store  48879 c@ 48879 c! i;
+i: c-fetch-store  48879 c@ 48879 c! i;
+i: fetch-store  48879 c@ 2 ! 2 @ 48879 c! i;
 i: arith  250 100 + 150 - 48879 c! i;
 
 routine primtest
