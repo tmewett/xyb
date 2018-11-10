@@ -224,22 +224,26 @@ primitive (literal)
 	(exit) jmp,
 
 : iliteral  [i'] (literal) icompile,  i, ;
-: try>number ( c-addr u -- [u] f )
-	\ if f is true, u is the given string as a number
-	0 0 2swap  >number nip  0= dup if nip else nip nip then ;
+: >number? ( c-addr u -- [u2] f )
+	\ if f is true, u2 is the given string as a number
+	0 0 2swap  >number nip nip  \ u2 u'
+	dup if nip then  0= ;
+
+: process-word ( addr u -- )
+	2dup ifind dup if icompile,
+		else drop  2dup >number? if iliteral
+		else ." invalid word in i: -> " type bye
+	then then
+	2drop ;
 
 \ a simple routine to compile to the image
 : i:
 	icreate  (colon) i,
-	begin \ keep reading and compiling words until we see i;
+	begin \ keep reading and processing words until we see i;
 		bl word count \ addr u
 		2dup s" i;" compare 0<> while
-		2dup ifind \ addr u xt
-			dup if icompile, 2drop
-			else drop try>number if iliteral then
-		then
-	repeat
-	2drop
+		process-word
+	repeat 2drop
 	[i'] exit icompile, ;
 
 primitive c! ( val addr -- )
