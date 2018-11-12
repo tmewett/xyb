@@ -79,7 +79,7 @@ include assembler.fth
 
 $D0 constant sp \ stack pointer
 $D2 constant bodyptr \ addr of last executed word's data part
-$D4 constant temp
+$DE constant temp
 
 
 	( Execution )
@@ -223,20 +223,30 @@ primitive (literal)
 	push jsr,
 	(exit) jmp,
 
+( The following definitions give us, the host, a nice syntax for compiling words
+to the image. In i:, if a word starts with ^ and it is defined in the host, the
+host definition is executed and nothing else is compiled. )
+
 : iliteral  [i'] (literal) icompile,  i, ;
+
 : >number? ( c-addr u -- [u2] f )
 	\ if f is true, u2 is the given string as a number
 	0 0 2swap  >number nip nip  \ u2 u'
 	dup if nip then  0= ;
 
+: host-word? ( c-addr u -- xt | 0 )
+	over c@ [char] ^ = if
+		find-name dup if name>int then
+	else 2drop 0 then ;
+
 : process-word ( addr u -- )
-	2dup ifind dup if icompile,
+	2dup host-word? dup if execute
+		else drop  2dup ifind dup if icompile,
 		else drop  2dup >number? if iliteral
 		else ." invalid word in i: -> " type bye
-	then then
+	then then then
 	2drop ;
 
-\ a simple routine to compile to the image
 : i:
 	icreate  (colon) i,
 	begin \ keep reading and processing words until we see i;
@@ -245,6 +255,8 @@ primitive (literal)
 		process-word
 	repeat 2drop
 	[i'] exit icompile, ;
+
+: ^  ' execute ;
 
 primitive c! ( val addr -- )
 	pop jsr,
@@ -325,8 +337,9 @@ primitive nand ( x y -- ~(x&y) )
 	(exit) jmp,
 
 \ temporary variable in 222 = $DE
-i: t!  222 ! i;
-i: t@  222 @ i;
+: ^temp  temp iliteral ;
+i: t!  ^temp ! i;
+i: t@  ^temp @ i;
 
 include words.fth
 include tests.fth
