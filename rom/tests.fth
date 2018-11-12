@@ -15,10 +15,12 @@ primitive c3!
 	(exit) jmp,
 
 : ^beef  $beef iliteral ;
+i: t.  ^beef c! i;
+i: rand  ^beef c@ i;
 i: simple  a5! c3! i;
-i: c-fetch-store  ^beef c@ ^beef c! i;
-i: fetch-store  ^beef c@ 2 ! 2 @ ^beef c! i;
-i: arith  250 100 + 150 - ^beef c! i;
+i: c-fetch-store  rand t. i;
+i: fetch-store  rand 2 ! 2 @ t. i;
+i: arith  250 100 + 150 - t. i;
 
 routine primtest
 	i' beef  >le ldx# lda#
