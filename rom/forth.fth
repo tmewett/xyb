@@ -79,6 +79,7 @@ include assembler.fth
 
 $D0 constant sp \ stack pointer
 $D2 constant bodyptr \ addr of last executed word's data part
+$D4 constant rsp \ return sp
 $DE constant temp
 
 
@@ -257,6 +258,25 @@ host definition is executed and nothing else is compiled. )
 	[i'] exit icompile, ;
 
 : ^  ' execute ;
+
+primitive r>
+	0 ldy#
+	rsp inc0
+	rsp lda(),y
+	tax
+	rsp inc0
+	rsp lda(),y
+	push jsr,
+	(exit) jmp,
+
+primitive >r
+	pop jsr,
+	rsp sta(),y
+	rsp dec0
+	txa
+	rsp sta(),y
+	rsp dec0
+	(exit) jmp,
 
 primitive c! ( val addr -- )
 	pop jsr,

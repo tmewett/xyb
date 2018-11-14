@@ -18,6 +18,7 @@ primitive c3!
 i: t.  ^beef c! i;
 i: rand  ^beef c@ i;
 i: simple  a5! c3! i;
+i: retstack  2 5 >r 3 r> t. t. t. i;
 i: c-fetch-store  rand t. i;
 i: fetch-store  rand 2 ! 2 @ t. i;
 i: arith  250 100 + 150 - t. i;
@@ -27,11 +28,16 @@ routine primtest
 	(execute) jsr,
 
 routine wordtest
-	\ initialise stack pointer
+	\ initialise stack pointers
 	$FF lda#
 	sp sta0
 	$04 lda#
 	sp 1+ sta0
+
+	$7F lda#
+	rsp sta0
+	$04 lda#
+	rsp 1+ sta0
 
 	\ choose the word
 	i' arith
