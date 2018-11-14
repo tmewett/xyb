@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
@@ -218,7 +219,7 @@ uint16_t read16(uint16_t address) {
     return (uint16_t)read6502(address+1) << 8 | read6502(address);
 }
 
-int loadtomem(char *fname, uint16_t addr) {
+void loadtomem(char *fname, uint16_t addr) {
 	FILE *f = fopen(fname, "r");
 	if (f==NULL) {
 		perror("loadtomem");
@@ -228,7 +229,7 @@ int loadtomem(char *fname, uint16_t addr) {
 	fclose(f);
 }
 
-int loadchars(char *fname, uint16_t addr) {
+void loadchars(char *fname, uint16_t addr) {
 	FILE *f = fopen(fname, "r");
 	if (f==NULL) {
 		perror("loadchars");

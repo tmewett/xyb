@@ -443,7 +443,7 @@ static void brk() {
     while (1) {
         if (fgets(str, 8, stdin) == NULL) break;
         if (str[0] == 'q') exit(0);
-        if (sscanf(str, "%x", &addr) < 0) break;
+        if (sscanf(str, "%hx", &addr) < 0) break;
         printf("%04X:  ", addr);
         for (int i=0; i<16; i++) printf("%02X ", read8(addr++));
         printf("\n");
