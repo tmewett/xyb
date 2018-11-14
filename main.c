@@ -245,8 +245,11 @@ int loadchars(char *fname, uint16_t addr) {
 	fclose(f);
 }
 
-int initialise() {
+void reset() {
 	srand(time(NULL));
+
+	memset(mem, 0, 0x10000);
+	memset(&mem[SCREENSTART+768], 0x40, 768);
 
 	loadchars("chars.gray", CHARSSTART);
 	loadtomem("rom/rom1", ROMSTART);
@@ -254,13 +257,8 @@ int initialise() {
 
 	write16(0xFFFC, ROMSTART); // set initial pc
 	write16(0xFFFE, ROMSTART); // for now, restart on IRQ
-	memset(&mem[SCREENSTART+768], 0x40, 768);
 
-	SDL_Init(SDL_INIT_VIDEO);
-	Win = SDL_CreateWindow("XY Brewer", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, \
-		SCALE*WINDOWW, SCALE*WINDOWH, 0);
-	WinSurf = SDL_GetWindowSurface(Win);
-	Screen = SDL_CreateRGBSurfaceWithFormat(0, WINDOWW, WINDOWH, 32, SDL_PIXELFORMAT_RGBA32);
+	reset6502();
 }
 
 void drawglyph(uint8_t glyph, int x, int y) {
@@ -332,24 +330,6 @@ void handletextevent(SDL_TextInputEvent *e) {
 }
 
 uint64_t asleep;
-int main(int argc, char **argv) {
-	DBGPRINTF("keygridsize = %d\n", KEYGRIDSIZE);
-	initialise();
-	reset6502();
-	uint64_t total = SDL_GetPerformanceCounter();
-
-	run6502();
-
-	uint64_t countfreq = SDL_GetPerformanceFrequency();
-	total = SDL_GetPerformanceCounter()-total;
-	printf("Averaged %f MHz CPU, %f FPS\n", \
-		(float)clockticks6502/(total/countfreq*1000000), \
-		(float)countfreq*frames/total);
-	printf("Spent %.3f%% of running time asleep\n", (float)asleep/total*100);
-	SDL_Quit();
-	return 0;
-}
-
 int handleevents() {
 	static uint64_t last, overcount;
 	uint64_t countfreq = SDL_GetPerformanceFrequency(),
@@ -384,5 +364,38 @@ int handleevents() {
 	}
 
 	last = SDL_GetPerformanceCounter();
+	return 0;
+}
+
+void sdlfatal() {
+	printf("Fatal SDL error: %s\n", SDL_GetError());
+	exit(1);
+}
+
+int main(int argc, char **argv) {
+	if (SDL_Init(SDL_INIT_VIDEO) < 0) sdlfatal();
+	Win = SDL_CreateWindow("XY Brewer", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, \
+		SCALE*WINDOWW, SCALE*WINDOWH, 0);
+	if (Win == NULL) sdlfatal();
+	WinSurf = SDL_GetWindowSurface(Win);
+	if (WinSurf == NULL) sdlfatal();
+	Screen = SDL_CreateRGBSurfaceWithFormat(0, WINDOWW, WINDOWH, 32, SDL_PIXELFORMAT_RGBA32);
+	if (Screen == NULL) sdlfatal();
+
+	DBGPRINTF("keygridsize = %d\n", KEYGRIDSIZE);
+	reset();
+
+	uint64_t total = SDL_GetPerformanceCounter();
+
+	run6502();
+
+	uint64_t countfreq = SDL_GetPerformanceFrequency();
+	total = SDL_GetPerformanceCounter()-total;
+	printf("Averaged %f MHz CPU, %f FPS\n", \
+		(float)clockticks6502/(total/countfreq*1000000), \
+		(float)countfreq*frames/total);
+	printf("Spent %.3f%% of running time asleep\n", (float)asleep/total*100);
+
+	SDL_Quit();
 	return 0;
 }
