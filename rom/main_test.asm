@@ -1,6 +1,9 @@
 .include "common.inc"
 
 jsr updatecurs
+lda #$04
+sta INPUTSTART+2
+
 jmp putct
 
 .proc drawct
@@ -30,5 +33,11 @@ loop:
 	sta (COLOURPTR),Y
 	lda $beef
 	jsr putchar
+	jmp loop
+.endproc
+
+.proc readlt
+loop:
+	jsr readline
 	jmp loop
 .endproc

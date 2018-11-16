@@ -7,6 +7,8 @@ TERMCURSX = $0300
 TERMCURSY = $0301
 SCREENPTR = $F0
 COLOURPTR = $F2
+CHARIN = INPUTSTART+5
+LINEBUF = $A0
 
 .macro memcpy dest, src, len ; AX
 .scope

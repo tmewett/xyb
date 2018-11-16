@@ -71,3 +71,56 @@ test:
 	rts
 .endproc
 .export updatecurs
+
+.proc readline
+buflen = 47
+	ldx #0
+	stx LINEBUF
+getc:
+	lda CHARIN
+	beq getc
+	; deleting or printing a character?
+	cmp #10 ; backspace
+	bne printing
+
+	; at beginning? do nothing
+	lda LINEBUF
+	beq getc
+	dec LINEBUF
+
+	; decide if we need to move cursor back up to prev line
+	lda TERMCURSX
+	bne sameline
+	dec TERMCURSY
+	lda #SCREENW ; will be decremented
+	sta TERMCURSX
+sameline:
+	dec TERMCURSX
+
+	jsr updatecurs
+	lda #0
+	ldy #0
+	sta (SCREENPTR),Y
+	jmp getc
+
+printing:
+	; finish if we're now full (a little user-unfriendly)
+	ldx LINEBUF
+	cpx #buflen
+	beq done
+	; append
+	sta LINEBUF+1,X
+	inc LINEBUF
+	; print
+	pha
+	jsr putchar
+	pla
+
+	cmp #8 ; line feed
+	beq done
+	jmp getc
+
+done:
+	rts
+.endproc
+.export readline
