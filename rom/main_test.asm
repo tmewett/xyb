@@ -41,3 +41,12 @@ loop:
 	jsr readline
 	jmp loop
 .endproc
+
+.proc cat
+	lda #$80
+	sta TERMCFG
+loop:
+	jsr getchar
+	jsr putchar
+	jmp loop
+.endproc

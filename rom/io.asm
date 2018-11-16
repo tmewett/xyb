@@ -27,6 +27,7 @@ scroll:
 	memcpy COLOURSTART, COLOURSTART+SCREENW, 256
 	memcpy COLOURSTART+256, COLOURSTART+256+SCREENW, 256
 	memcpy COLOURSTART+512, COLOURSTART+512+SCREENW, 256-SCREENW
+	memset SCREENSTART+768-SCREENW, 0, SCREENW ; clear new lines
 	memset COLOURSTART+768-SCREENW, $40, SCREENW ; set new lines to white on black
 nocolour:
 	lda #0
@@ -124,3 +125,28 @@ done:
 	rts
 .endproc
 .export readline
+
+.proc getchar ; X puts A=char
+	lda TERMCFG
+	and #$80
+	beq getc
+
+	sec ; don't refill if offset < length
+	lda LBUFOFF
+	cmp LINEBUF
+	bcc norefill
+	jsr readline
+	lda #0
+	sta LBUFOFF
+norefill:
+	ldx LBUFOFF
+	inc LBUFOFF
+	lda LINEBUF+1,X
+	rts
+
+getc:
+	lda CHARIN
+	beq getc
+	rts
+.endproc
+.export getchar
