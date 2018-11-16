@@ -323,10 +323,9 @@ void handlekeyevent(SDL_KeyboardEvent *e) {
 }
 
 void handletextevent(SDL_TextInputEvent *e) {
-	char c = e->text[0];
-	// got events with c=5 while testing, don't know why.
-	if (inputreg & 0x04 && c >= 8) {
-		gotchar = c;
+	char *s = e->text;
+	if (inputreg & 0x04 && s[1] == '\0') {
+		gotchar = s[0];
 	}
 }
 
