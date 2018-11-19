@@ -220,7 +220,7 @@ uint16_t read16(uint16_t address) {
 }
 
 void loadtomem(char *fname, uint16_t addr) {
-	FILE *f = fopen(fname, "r");
+	FILE *f = fopen(fname, "rb");
 	if (f==NULL) {
 		perror("loadtomem");
 		exit(1);
@@ -230,7 +230,7 @@ void loadtomem(char *fname, uint16_t addr) {
 }
 
 void loadchars(char *fname, uint16_t addr) {
-	FILE *f = fopen(fname, "r");
+	FILE *f = fopen(fname, "rb");
 	if (f==NULL) {
 		perror("loadchars");
 		exit(1);
