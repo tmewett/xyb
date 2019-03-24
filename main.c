@@ -37,6 +37,7 @@
 #ifdef DEBUG
 extern uint16_t pc, status;
 #define DBGPRINTF(s, ...) printf((s), __VA_ARGS__)
+#define FLAGSTR(mask, s) (status & (mask) ? (s) : "-")
 #else
 #define DBGPRINTF(...)
 #endif
@@ -80,20 +81,10 @@ SDL_Keycode keygrid[] = {
 
 bool keydown[KEYGRIDSIZE];
 
-#define READPERIPH(peri, len) \
-	if (addr >= base && addr <= base+len) {\
-		return peri##read(addr-base);\
-	}\
-	base += len;
-#define WRITEPERIPH(peri, len) \
-	if (addr >= base && addr <= base+len) {\
-		peri##write(addr-base, value);\
-		return;\
-	}\
-	base += len;
 
 // mousereg - XYLMRCxx
 uint8_t kbrow, inputreg, gotchar;
+
 uint8_t inputread(uint16_t reg) {
 	if (reg==0) {
 		return kbrow;
@@ -130,6 +121,7 @@ uint8_t inputread(uint16_t reg) {
 		return c;
 	}
 }
+
 void inputwrite(uint16_t reg, uint8_t value) {
 	if (reg==0) {
 		kbrow = value;
@@ -138,10 +130,12 @@ void inputwrite(uint16_t reg, uint8_t value) {
 	}
 }
 
+
 // ERIFxxxx
 uint8_t timerreg[2];
 uint16_t timerval[2];
 uint16_t timerinit[2];
+
 uint8_t timerread(uint16_t reg) {
 	int n = reg/3;
 	reg %= 3;
@@ -151,6 +145,7 @@ uint8_t timerread(uint16_t reg) {
 		return (timerval[n] >> 8*(reg-1)) & 0xFF;
 	}
 }
+
 void timerwrite(uint16_t reg, uint8_t value) {
 	int n = reg/3;
 	reg %= 3;
@@ -167,6 +162,7 @@ void timerwrite(uint16_t reg, uint8_t value) {
 		timerval[n] = timerinit[n];
 	}
 }
+
 int updatetimer(int n) {
 	int irq = 0;
 	if (!(timerreg[n] & 0x80)) return 0; // skip if disabled
@@ -183,28 +179,37 @@ int updatetimer(int n) {
 
 
 uint8_t read8(uint16_t addr) {
-	#ifdef DEBUG
+#ifdef DEBUG
 	if (addr == 0xBEEF) {
 		return rand() % 256;
 	}
-	#endif
-	int base = PERIPHSTART;
-	READPERIPH(input, INPUTLEN);
-	READPERIPH(timer, 2*TIMERLEN);
+#endif
+	int i = PERIPHSTART;
+	if (addr >= i && addr < i + INPUTLEN) {
+		return inputread(addr - i);
+	}
+	i += INPUTLEN;
+	if (addr >= i && addr < i + 2*TIMERLEN) {
+		return timerread(addr - i);
+	}
 	return mem[addr];
 }
+
 void write8(uint16_t addr, uint8_t value) {
-	#ifdef DEBUG
-	#define FLAGSTR(mask, s) (status & (mask) ? (s) : "-")
+#ifdef DEBUG
 	if (addr == 0xBEEF) {
 		printf("($%04X)  $%02X = %d  (%s)\n", pc, value, value,
 			FLAGSTR(0x01, "C"));
 	}
-	#undef FLAGSTR
-	#endif
-	int base = PERIPHSTART;
-	WRITEPERIPH(input, INPUTLEN);
-	WRITEPERIPH(timer, 2*TIMERLEN);
+#endif
+	uint16_t i = PERIPHSTART;
+	if (addr >= i && addr < i + INPUTLEN) {
+		return inputwrite(addr - i, value);
+	}
+	i += INPUTLEN;
+	if (addr >= i && addr < i + 2*TIMERLEN) {
+		return timerwrite(addr - i, value);
+	}
 	mem[addr] = value;
 }
 
@@ -218,6 +223,7 @@ uint16_t read16(uint16_t address) {
 	// little endian
     return (uint16_t)read6502(address+1) << 8 | read6502(address);
 }
+
 
 void loadtomem(char *fname, uint16_t addr) {
 	FILE *f = fopen(fname, "rb");
