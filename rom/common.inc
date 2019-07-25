@@ -15,7 +15,8 @@ LINEBUF = $A0
 LBUFLEN = 47
 LBUFOFF = $0303
 
-.macro memcpy dest, src, len ; AX
+; copies from beginning to end, so overlapping is ok as long as it's backwards
+.macro memcpym dest, src, len ; AX
 .scope
 	sec
 	ldx #0
@@ -28,11 +29,10 @@ loop:
 .endscope
 .endmacro
 
-.macro memset dest, val, len ; AX
+.macro memsetm dest, len ; A=val X
 .scope
 	sec
 	ldx #0
-	lda #val
 loop:
 	sta dest,X
 	cpx #len-1
