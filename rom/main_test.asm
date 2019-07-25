@@ -3,6 +3,8 @@
 jsr updatecurs
 lda #$04
 sta INPUTSTART+2
+lda #$F0
+sta GFXSTART
 
 jmp putct
 

@@ -23,6 +23,7 @@
 
 #define PERIPHSTART 0x0200
 #define INPUTLEN 6
+#define GFXLEN 3
 #define TIMERLEN 3
 
 #define ROMSTART 0xE000
@@ -135,6 +136,11 @@ void inputwrite(uint16_t reg, uint8_t value) {
 }
 
 
+/* Cxxxxxx
+	C - draw cursor */
+uint8_t gfxreg[3];
+
+
 // ERIFxxxx
 uint8_t timerreg[2];
 uint16_t timerval[2];
@@ -193,6 +199,10 @@ uint8_t read8(uint16_t addr) {
 		return inputread(addr - i);
 	}
 	i += INPUTLEN;
+	if (addr >= i && addr < i + GFXLEN) {
+		return gfxreg[addr-i];
+	}
+	i += GFXLEN;
 	if (addr >= i && addr < i + 2*TIMERLEN) {
 		return timerread(addr - i);
 	}
@@ -211,6 +221,11 @@ void write8(uint16_t addr, uint8_t value) {
 		return inputwrite(addr - i, value);
 	}
 	i += INPUTLEN;
+	if (addr >= i && addr < i + GFXLEN) {
+		gfxreg[addr-i] = value;
+		return;
+	}
+	i += GFXLEN;
 	if (addr >= i && addr < i + 2*TIMERLEN) {
 		return timerwrite(addr - i, value);
 	}
@@ -278,21 +293,22 @@ void drawglyph(uint8_t glyph, int x, int y) {
 	int fg = (colour >> 4) & 0xF;
 	int bg = colour & 0xF;
 	fg *= 3; bg *= 3;
-	uint32_t *pixels = (uint32_t *)Screen->pixels;
+
+	bool invert = (gfxreg[0] & 0xF0) && x == gfxreg[1] && y == gfxreg[2];
+
 	for (int gy=0; gy<8; gy++) {
 		uint8_t bits = mem[CHARSSTART+glyph*8+gy];
 		int sy = TILEH*(y+BORDERW) + gy;
+
 		for (int gx=0; gx<8; gx++) {
 			int sx = TILEW*(x+BORDERW) + gx;
-			int index;
-			if (bits & 128>>gx) {
-				// foreground
-				index = fg;
-			} else {
-				// background
-				index = bg;
-			}
-			pixels[sy*WINDOWW+sx] = SDL_MapRGB(Screen->format, palette[index], palette[index+1], palette[index+2]);
+
+			int usefg = bits & 128>>gx;
+			if (invert) usefg = !usefg;
+			int index = usefg ? fg : bg;
+
+			((uint32_t *)Screen->pixels)[sy*WINDOWW+sx] = \
+				SDL_MapRGB(Screen->format, palette[index], palette[index+1], palette[index+2]);
 		}
 	}
 }
