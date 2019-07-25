@@ -81,6 +81,10 @@ SDL_Keycode keygrid[] = {
 
 bool keydown[KEYGRIDSIZE];
 
+uint64_t countfreq;
+uint64_t asleep = 0;
+int frames = 0;
+
 
 // mousereg - XYLMRCxx
 uint8_t kbrow, inputreg, gotchar;
@@ -293,7 +297,6 @@ void drawglyph(uint8_t glyph, int x, int y) {
 	}
 }
 
-int frames = 0;
 void drawscreen() {
 	//~ for (int i=0; i<256; i++) {
 	for (int i=0; i<SCREENH*SCREENW; i++) {
@@ -335,14 +338,7 @@ void handletextevent(SDL_TextInputEvent *e) {
 	}
 }
 
-uint64_t asleep;
 int handleevents() {
-	static uint64_t last, overcount;
-	uint64_t countfreq = SDL_GetPerformanceFrequency(),
-		// how many perf ticks per clump
-		clumpcount = countfreq / CPUFREQ * CLUMPSIZE,
-		count, extra;
-
 	SDL_Event e;
 	SDL_PollEvent(&e);
 	if (e.type == SDL_QUIT) {
@@ -353,24 +349,24 @@ int handleevents() {
 		handletextevent(&e.text);
 	}
 
-	count = SDL_GetPerformanceCounter() - last;
-
-	if (last != 0) { // don't sleep on first invocation
-		if (count <= clumpcount) {
-			// We finished too early, so sleep. But adjust our sleep time down to
-			// account for any "debt" from previous late finishes
-			extra = MIN(overcount, clumpcount-count);
-			overcount -= extra;
-			SDL_Delay(1000*(clumpcount-count-extra)/countfreq);
-			asleep += clumpcount-count-extra;
-		} else {
-			// We finished too late, so record how much by
-			overcount += count - clumpcount;
-		}
-	}
-
-	last = SDL_GetPerformanceCounter();
 	return 0;
+}
+
+void stretchysleep(uint64_t delta) {
+	static uint64_t overcount = 0;
+	uint64_t extra, clumpcount = countfreq / CPUFREQ * CLUMPSIZE;
+
+	if (delta <= clumpcount) {
+		// We finished too early, so sleep. But adjust our sleep time down to
+		// account for any "debt" from previous late finishes
+		extra = MIN(overcount, clumpcount - delta);
+		overcount -= extra;
+		SDL_Delay(1000*(clumpcount - delta - extra)/countfreq);
+		asleep += clumpcount - delta - extra;
+	} else {
+		// We finished too late, so record how much by
+		overcount += delta - clumpcount;
+	}
 }
 
 void sdlfatal() {
@@ -379,23 +375,42 @@ void sdlfatal() {
 }
 
 int main(int argc, char **argv) {
+
 	if (SDL_Init(SDL_INIT_VIDEO) < 0) sdlfatal();
+
 	Win = SDL_CreateWindow("XY Brewer", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, \
 		SCALE*WINDOWW, SCALE*WINDOWH, 0);
 	if (Win == NULL) sdlfatal();
+
 	WinSurf = SDL_GetWindowSurface(Win);
 	if (WinSurf == NULL) sdlfatal();
+
 	Screen = SDL_CreateRGBSurfaceWithFormat(0, WINDOWW, WINDOWH, 32, SDL_PIXELFORMAT_RGBA32);
 	if (Screen == NULL) sdlfatal();
+
+	countfreq = SDL_GetPerformanceFrequency();
 
 	DBGPRINTF("keygridsize = %d\n", KEYGRIDSIZE);
 	reset();
 
-	uint64_t total = SDL_GetPerformanceCounter();
+	uint64_t total = SDL_GetPerformanceCounter(), lastcount;
+	uint32_t lastdraw = clockticks6502;
 
-	run6502();
+	while (1) {
+		lastcount = SDL_GetPerformanceCounter();
 
-	uint64_t countfreq = SDL_GetPerformanceFrequency();
+		if (handleevents()) break;
+
+		exec6502(CLUMPSIZE);
+
+		if (clockticks6502 > lastdraw + DRAWTICKS) {
+			drawscreen();
+			lastdraw += DRAWTICKS;
+		}
+
+		stretchysleep(SDL_GetPerformanceCounter() - lastcount);
+	}
+
 	total = SDL_GetPerformanceCounter()-total;
 	printf("Averaged %f MHz CPU, %f FPS\n", \
 		(float)clockticks6502/(total/countfreq*1000000), \

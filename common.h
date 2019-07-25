@@ -7,7 +7,7 @@
 uint8_t read8(uint16_t address);
 void write8(uint16_t address, uint8_t value);
 void reset6502();
-void run6502();
+void exec6502();
 extern uint32_t clockticks6502;
 extern uint32_t lasttimer[2];
 
