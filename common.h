@@ -1,6 +1,7 @@
 #define CPUFREQ 1000000
-#define CLUMPSIZE (CPUFREQ/100) // no. of cpu ticks to do between throttling
+#define CLUMPSIZE (CPUFREQ/100) // no. of cpu ticks to do between processing
 #define DRAWTICKS (CPUFREQ/30) // minimum no. of cpu ticks before redraw
+#define EVENTTICKS (CPUFREQ/60) // minimum no. of cpu ticks before redraw
 
 #define read6502(addr) read8((addr))
 #define write6502(addr, val) write8((addr), (val))

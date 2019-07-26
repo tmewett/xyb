@@ -83,7 +83,7 @@ SDL_Keycode keygrid[] = {
 bool keydown[KEYGRIDSIZE];
 
 uint64_t countfreq;
-uint64_t asleep = 0;
+uint32_t asleep = 0;
 int frames = 0;
 
 
@@ -369,19 +369,31 @@ int handleevents() {
 }
 
 void stretchysleep(uint64_t delta) {
-	static uint64_t overcount = 0;
-	uint64_t extra, clumpcount = countfreq / CPUFREQ * CLUMPSIZE;
+	static int64_t overcount = 0;
 
-	if (delta <= clumpcount) {
+	uint64_t clumpcount = countfreq / CPUFREQ * CLUMPSIZE;
+	int64_t gap = clumpcount - delta;
+
+	if (gap > 0) {
 		// We finished too early, so sleep. But adjust our sleep time down to
 		// account for any "debt" from previous late finishes
-		extra = MIN(overcount, clumpcount - delta);
-		overcount -= extra;
-		SDL_Delay(1000*(clumpcount - delta - extra)/countfreq);
-		asleep += clumpcount - delta - extra;
+		uint64_t sleep;
+		uint32_t sleepms;
+
+		sleep = gap - MIN(overcount, gap);
+		sleepms = 1000*sleep/countfreq;
+
+		// ~ printf("SS: %d to fill, with debt %d, so sleeping %d (%d ms)\n", gap, overcount, sleep, sleepms);
+		sleep = SDL_GetPerformanceCounter();
+		SDL_Delay(sleepms);
+
+		// Decrease overcount by the amount of time we didn't sleep
+		overcount -= gap - (SDL_GetPerformanceCounter() - sleep);
+
+		asleep += sleepms;
 	} else {
-		// We finished too late, so record how much by
-		overcount += delta - clumpcount;
+		// We finished too late, so record how much by (gap is -ve)
+		overcount -= gap;
 	}
 }
 
@@ -409,13 +421,17 @@ int main(int argc, char **argv) {
 	DBGPRINTF("keygridsize = %d\n", KEYGRIDSIZE);
 	reset();
 
-	uint64_t total = SDL_GetPerformanceCounter(), lastcount;
-	uint32_t lastdraw = clockticks6502;
+	uint64_t lastcount;
+	uint32_t lastdraw, lastevents, total = SDL_GetTicks();
+	lastdraw = lastevents = clockticks6502;
 
 	while (1) {
 		lastcount = SDL_GetPerformanceCounter();
 
-		if (handleevents()) break;
+		if (clockticks6502 > lastevents + EVENTTICKS) {
+			if (handleevents()) break;
+			lastevents += EVENTTICKS;
+		}
 
 		exec6502(CLUMPSIZE);
 
@@ -427,11 +443,11 @@ int main(int argc, char **argv) {
 		stretchysleep(SDL_GetPerformanceCounter() - lastcount);
 	}
 
-	total = SDL_GetPerformanceCounter()-total;
-	printf("Averaged %f MHz CPU, %f FPS\n", \
-		(float)clockticks6502/(total/countfreq*1000000), \
-		(float)countfreq*frames/total);
-	printf("Spent %.3f%% of running time asleep\n", (float)asleep/total*100);
+	total = SDL_GetTicks() - total;
+	printf("Averaged %.3f MHz CPU, %.3f FPS\n",
+		(float)clockticks6502 / CPUFREQ * 1000 / total,
+		(float)frames * 1000 / total);
+	printf("Spent %.3f%% of running time asleep\n", (float)asleep / total * 100);
 
 	SDL_Quit();
 	return 0;
