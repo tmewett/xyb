@@ -38,6 +38,23 @@ loop:
 	jmp loop
 .endproc
 
+.proc timert
+	ldast16 50, TIMERSTART+1
+loop:
+	lda #%11000000
+	sta TIMERSTART
+	lda $beef
+	ldy #0
+	sta (COLOURPTR),Y
+	lda $beef
+	jsr putchar
+wait:
+	lda #%00010000
+	bit TIMERSTART
+	beq wait
+	jmp loop
+.endproc
+
 .proc readlt
 loop:
 	jsr readline

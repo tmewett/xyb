@@ -1,5 +1,6 @@
 INPUTSTART = $0200
 GFXSTART = $0206
+TIMERSTART = $0209
 SCREENSTART = $D000
 COLOURSTART = SCREENSTART+768
 SCREENW = 32
@@ -39,4 +40,11 @@ loop:
 	inx
 	bcc loop
 .endscope
+.endmacro
+
+.macro ldast16 val, addr
+	lda #<val
+	sta addr
+	lda #>val
+	sta addr+1
 .endmacro

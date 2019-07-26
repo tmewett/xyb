@@ -965,8 +965,6 @@ void exec6502(uint32_t tickcount) {
 
 }
 
-uint32_t lasttimer[2]; // exported
-
 void step6502() {
     opcode = read6502(pc++);
     status |= FLAG_CONSTANT;

@@ -24,7 +24,7 @@
 #define PERIPHSTART 0x0200
 #define INPUTLEN 6
 #define GFXLEN 3
-#define TIMERLEN 3
+#define TIMERLEN 6
 
 #define ROMSTART 0xE000
 #define CHARSSTART 0xD800 // 0x800=2048 before ROM
@@ -161,7 +161,6 @@ void timerwrite(uint16_t reg, uint8_t value) {
 	reg %= 3;
 	if (reg==0) {
 		// is enable going 0 -> 1 ?
-		if (value & 0x80 && !(timerreg[n] & 0x80)) lasttimer[n] = SDL_GetTicks();
 		timerreg[n] = value;
 	} else {
 		// unset enable
@@ -173,12 +172,11 @@ void timerwrite(uint16_t reg, uint8_t value) {
 	}
 }
 
-int updatetimer(int n) {
-	int irq = 0;
-	if (!(timerreg[n] & 0x80)) return 0; // skip if disabled
-	if (timerval[n] == 1) { // about to hit zero?
-		timerval[n] -= 1;
-		timerreg[n] |= 0x10; // set flag
+bool updatetimer(int n) {
+	bool irq = false;
+	if (!(timerreg[n] & 0x80)) return false; // skip if disabled
+	if (timerval[n] == 0) { // enabled and zero?
+		timerreg[n] |= 0x10; // set finished flag
 		if (timerreg[n] & 0x20) irq = true;
 		if (timerreg[n] & 0x40) timerval[n] = timerinit[n]; // refill if set
 		else timerreg[n] &= ~0x8F; // disable otherwise
@@ -203,7 +201,7 @@ uint8_t read8(uint16_t addr) {
 		return gfxreg[addr-i];
 	}
 	i += GFXLEN;
-	if (addr >= i && addr < i + 2*TIMERLEN) {
+	if (addr >= i && addr < i + TIMERLEN) {
 		return timerread(addr - i);
 	}
 	return mem[addr];
@@ -226,7 +224,7 @@ void write8(uint16_t addr, uint8_t value) {
 		return;
 	}
 	i += GFXLEN;
-	if (addr >= i && addr < i + 2*TIMERLEN) {
+	if (addr >= i && addr < i + TIMERLEN) {
 		return timerwrite(addr - i, value);
 	}
 	mem[addr] = value;
@@ -432,6 +430,11 @@ int main(int argc, char **argv) {
 			if (handleevents()) break;
 			lastevents += EVENTTICKS;
 		}
+
+		bool irq = false;
+		if (updatetimer(0)) irq = true;
+		if (updatetimer(1)) irq = true;
+		if (irq) irq6502();
 
 		exec6502(CLUMPSIZE);
 
