@@ -1,7 +1,7 @@
 # we have to have the main object file assembled at the top of the final rom
 MAIN := main_test.asm
-ASMS := $(MAIN) $(shell find -iname '*.asm' ! -iname 'main*')
-OBJS := $(addsuffix .o,$(basename $(ASMS)))
+ASMS := jumptable.asm $(MAIN) io.asm core.asm
+OBJS := $(ASMS:.asm=.o)
 
 all: rom1 rom2
 

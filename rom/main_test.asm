@@ -1,12 +1,13 @@
 .include "common.inc"
 
-jsr updatecurs
-lda #$04
-sta INPUTSTART+2
-lda #$F0
-sta GFXSTART
+.proc reset
+	jsr updatecurs
+	lda #$F0
+	sta GFXSTART
 
-jmp putct
+	jmp putct
+.endproc
+.export reset
 
 .proc drawct
 	ldy #0
