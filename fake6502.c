@@ -109,6 +109,8 @@
 uint32_t SDL_GetTicks();
 
 //6502 defines
+#define FIX_IND_JMP
+
 //~ #define UNDOCUMENTED //when this is defined, undocumented opcodes are handled.
                      //otherwise, they're simply treated as NOPs.
 
@@ -281,7 +283,11 @@ static void absy() { //absolute,Y
 static void ind() { //indirect
     uint16_t eahelp, eahelp2;
     eahelp = (uint16_t)read6502(pc) | (uint16_t)((uint16_t)read6502(pc+1) << 8);
+#ifdef FIX_IND_JMP
+    eahelp2 = eahelp + 1;
+#else
     eahelp2 = (eahelp & 0xFF00) | ((eahelp + 1) & 0x00FF); //replicate 6502 page-boundary wraparound bug
+#endif
     ea = (uint16_t)read6502(eahelp) | ((uint16_t)read6502(eahelp2) << 8);
     pc += 2;
 }
