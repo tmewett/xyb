@@ -40,37 +40,32 @@ nocolour:
 
 ; update the cursor pointers from the cursor X,Y coords
 .proc updatecurs ; AX
-	sec
-	lda TERMCURSY
-	ldx #0
-test:
-	inx
-	sbc #8
-	bcs test
-	; carry clear
-	adc #8
-	; now X=1,2,3 depending on which third of the screen the cursor is in
-	; and A is the cursor Y coord offset from the top of the third
+	lda #0
+	sta SCREENPTR+1
 
-	; assign 32*A+x to the low bytes
+	; multiply ycoord by 5 (assuming SCREENW is 32)
+	lda TERMCURSY
+	ldx #5
+left:
 	asl
-	asl
-	asl
-	asl
-	asl
+	rol SCREENPTR+1
+	dex
+	bne left
+
+	; A contains low byte of ycoord*SCREENW, SCREENPTR+1 contains high
+	; ycoord*SCREENW + xcoord is final value to store (here we assume screen and colour mem are page-aligned)
+	clc
 	adc TERMCURSX
 	sta SCREENPTR
 	sta COLOURPTR
 
-	; add X-1 to the high bytes (256*(X-1) in total)
-	dex
-	txa
-	adc #.HIBYTE(SCREENSTART)
+	; now add start addresses to the high byte
+	lda SCREENPTR+1
+	adc #>SCREENSTART
 	sta SCREENPTR+1
-	txa
-	adc #.HIBYTE(COLOURSTART)
+	clc ; only needed carry for first add
+	adc #>(COLOURSTART-SCREENSTART)
 	sta COLOURPTR+1
-
 	rts
 .endproc
 .export updatecurs
