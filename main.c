@@ -44,6 +44,8 @@ extern uint16_t pc, status;
 #endif
 
 uint8_t mem[1<<16];
+uint8_t vbuf[SCREENH*SCREENW*2];
+
 SDL_Window *Win;
 SDL_Surface *WinSurf;
 SDL_Surface *Screen;
@@ -136,9 +138,22 @@ void inputwrite(uint16_t reg, uint8_t value) {
 }
 
 
-/* Cxxxxxx
-	C - draw cursor */
+/* CPDxxxx
+	C - draw cursor
+	P - buffer paged into memory
+	D - buffer to draw */
 uint8_t gfxreg[3];
+void gfxwrite(uint16_t reg, uint8_t value) {
+	// was P bit changed?
+	if (reg==0 && ((value ^ gfxreg[0]) & 0x40)) {
+		// swap video RAM and buffer
+		uint8_t temp[SCREENH*SCREENW*2];
+		memcpy(temp, &mem[SCREENSTART], SCREENH*SCREENW*2);
+		memcpy(&mem[SCREENSTART], vbuf, SCREENH*SCREENW*2);
+		memcpy(vbuf, temp, SCREENH*SCREENW*2);
+	}
+	gfxreg[reg] = value;
+}
 
 
 /* ERIFxxxx
@@ -224,8 +239,7 @@ void write8(uint16_t addr, uint8_t value) {
 	}
 	i += INPUTLEN;
 	if (addr >= i && addr < i + GFXLEN) {
-		gfxreg[addr-i] = value;
-		return;
+		return gfxwrite(addr - i, value);
 	}
 	i += GFXLEN;
 	if (addr >= i && addr < i + TIMERLEN) {
@@ -289,9 +303,8 @@ void reset() {
 	reset6502();
 }
 
-void drawglyph(uint8_t glyph, int x, int y) {
+void drawglyph(uint8_t glyph, uint8_t colour, int x, int y) {
 	// upper 4 bits are index of foreground colour, lower 4 are background
-	uint8_t colour = mem[SCREENSTART+768+y*SCREENW+x];
 	int fg = (colour >> 4) & 0xF;
 	int bg = colour & 0xF;
 	fg *= 3; bg *= 3;
@@ -316,11 +329,16 @@ void drawglyph(uint8_t glyph, int x, int y) {
 }
 
 void drawscreen() {
+	uint8_t cfg = gfxreg[0] & 0x60;
+	// are the page and draw bits the same? then use RAM, otherwise use buffer
+	uint8_t *buf = (cfg == 0x60 || cfg == 0x00) ? &mem[SCREENSTART] : vbuf;
+
 	//~ for (int i=0; i<256; i++) {
 	for (int i=0; i<SCREENH*SCREENW; i++) {
-		drawglyph(mem[SCREENSTART+i], i%SCREENW, i/SCREENW);
+		drawglyph(buf[i], buf[0x300+i], i%SCREENW, i/SCREENW);
 		//~ drawglyph(i, i%16, i/16);
 	}
+
 	SDL_BlitScaled(Screen, NULL, WinSurf, NULL);
 	SDL_UpdateWindowSurface(Win);
 	frames++;
