@@ -2,7 +2,7 @@
 
 .proc reset
 	jsr updatecurs
-	lda #$F0
+	lda #$80
 	sta GFXSTART
 
 	jmp putct

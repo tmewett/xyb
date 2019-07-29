@@ -67,16 +67,13 @@ uint8_t palette[] = { // pico-8's colours
 };
 
 SDL_Keycode keygrid[] = {
-	SDLK_QUOTE, SDLK_COMMA, SDLK_MINUS, SDLK_PERIOD, SDLK_SLASH,
-	SDLK_SEMICOLON, SDLK_EQUALS, SDLK_LEFTBRACKET, SDLK_RIGHTBRACKET,
-	SDLK_BACKSLASH, SDLK_BACKQUOTE,
-	SDLK_0, SDLK_1, SDLK_2, SDLK_3, SDLK_4, SDLK_5, SDLK_6, SDLK_7,
-	SDLK_8, SDLK_9,
-	SDLK_a, SDLK_b, SDLK_c, SDLK_d, SDLK_e, SDLK_f, SDLK_g,
-	SDLK_h, SDLK_i, SDLK_j, SDLK_k, SDLK_l, SDLK_m, SDLK_n, SDLK_o,
-	SDLK_p, SDLK_q, SDLK_r, SDLK_s, SDLK_t, SDLK_u, SDLK_v, SDLK_w,
-	SDLK_x, SDLK_y, SDLK_z,
-	SDLK_BACKSPACE, SDLK_RETURN, SDLK_LSHIFT, SDLK_LCTRL, SDLK_SPACE
+	SDLK_QUOTE, SDLK_COMMA, SDLK_MINUS, SDLK_PERIOD, SDLK_SLASH, SDLK_SEMICOLON, SDLK_EQUALS, SDLK_LEFTBRACKET,
+	SDLK_RIGHTBRACKET, SDLK_BACKSLASH, SDLK_BACKQUOTE, SDLK_0, SDLK_1, SDLK_2, SDLK_3, SDLK_4,
+	SDLK_5, SDLK_6, SDLK_7, SDLK_8, SDLK_9, SDLK_a, SDLK_b, SDLK_c,
+	SDLK_d, SDLK_e, SDLK_f, SDLK_g, SDLK_h, SDLK_i, SDLK_j, SDLK_k,
+	SDLK_l, SDLK_m, SDLK_n, SDLK_o, SDLK_p, SDLK_q, SDLK_r, SDLK_s,
+	SDLK_t, SDLK_u, SDLK_v, SDLK_w, SDLK_x, SDLK_y, SDLK_z, SDLK_BACKSPACE,
+	SDLK_RETURN, SDLK_LSHIFT, SDLK_LCTRL, SDLK_SPACE
 };
 #define KEYGRIDSIZE (sizeof(keygrid)/sizeof(SDL_Keycode))
 
@@ -87,8 +84,11 @@ uint32_t asleep = 0;
 int frames = 0;
 
 
-// mousereg - XYLMRCxx
-uint8_t kbrow, inputreg, gotchar;
+/* inputreg - XYLMRCxx
+	X,Y - scale resp mouse coord to character cells
+	L,M,R - left/middle/right mouse buttons down
+	C - update gotchar reg */
+uint8_t kbrow, inputreg = 0x04, gotchar;
 
 uint8_t inputread(uint16_t reg) {
 	if (reg==0) {
@@ -141,7 +141,11 @@ void inputwrite(uint16_t reg, uint8_t value) {
 uint8_t gfxreg[3];
 
 
-// ERIFxxxx
+/* ERIFxxxx
+	Enable
+	Reset on finish
+	Interrupt trigger
+	Finished? */
 uint8_t timerreg[2];
 uint16_t timerval[2];
 uint16_t timerinit[2];
