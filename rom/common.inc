@@ -51,3 +51,12 @@ loop:
 	lda #>val
 	sta addr+1
 .endmacro
+
+.macro inc16 addr
+.scope
+	inc addr
+	bne skip
+	inc addr+1
+skip:
+.endscope
+.endmacro
