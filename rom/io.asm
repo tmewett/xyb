@@ -75,8 +75,10 @@ test:
 .endproc
 .export updatecurs
 
-.proc readline
-buflen = 47
+
+; Begins line input with basic editing support.
+; Input ends when the enter key is pressed. The buffer includes the newline if there is space.
+.proc readline ; AX
 	ldx #0
 	stx LINEBUF
 getc:
@@ -89,8 +91,8 @@ getc:
 	; at beginning? do nothing
 	lda LINEBUF
 	beq getc
-	dec LINEBUF
 
+	dec LINEBUF
 	; decide if we need to move cursor back up to prev line
 	lda TERMCURSX
 	bne sameline
@@ -107,10 +109,10 @@ sameline:
 	jmp getc
 
 printing:
-	; finish if we're now full (a little user-unfriendly)
+	; if we're full, don't add to buffer, just check for newline
 	ldx LINEBUF
-	cpx #buflen
-	beq done
+	cpx #LBUFLEN-1
+	beq full
 	; append
 	sta LINEBUF+1,X
 	inc LINEBUF
@@ -119,6 +121,7 @@ printing:
 	jsr putchar
 	pla
 
+full:
 	cmp #8 ; line feed
 	beq done
 	jmp getc
@@ -127,6 +130,7 @@ done:
 	rts
 .endproc
 .export readline
+
 
 .proc getchar ; X puts A=char
 	lda TERMCFG

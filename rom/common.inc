@@ -3,18 +3,21 @@ GFXSTART = $0206
 TIMERSTART = $0209
 SCREENSTART = $D000
 COLOURSTART = SCREENSTART+768
+
 SCREENW = 32
 SCREENH = 24
 SCREENLEN = SCREENW * SCREENH
+
 TERMCURSX = GFXSTART+1
 TERMCURSY = GFXSTART+2
 TERMCFG = $0302 ; Lxxxxxxx
 SCREENPTR = $F0
 COLOURPTR = $F2
 CHARIN = INPUTSTART+5
-LINEBUF = $A0
-LBUFLEN = 47
+; input line buffer for IO. first byte is length of contents
+LBUFLEN = 64
 LBUFOFF = $0303
+LINEBUF = $0304
 
 ; copies from beginning to end, so overlapping is ok as long as it's backwards
 .macro memcpym dest, src, len ; AX
