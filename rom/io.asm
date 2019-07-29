@@ -38,6 +38,19 @@ nocolour:
 .endproc
 .export putchar
 
+
+.proc clrcolour ; A=colour X
+	ldx #0
+loop:
+.repeat 3, i
+	sta COLOURSTART+256*i,X
+.endrep
+	dex
+	bne loop
+	rts
+.endproc
+.export clrcolour
+
 ; update the cursor pointers from the cursor X,Y coords
 .proc updatecurs ; AX
 	lda #0
