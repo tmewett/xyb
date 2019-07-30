@@ -77,8 +77,17 @@ variable ilatest  0 ilatest ! \ target addr of latest word in image
 : asm-arg-none  ic, ;
 : asm-arg-byte  ic, ic, ;
 : asm-arg-word  ic, i, ;
-: asm-arg-relative  ic,  there - 1+  ic, ;
+: asm-arg-relative  ic,  ihere 2 + -  ic, ; \ add 2 because offset is from byte after branch instr
 include assembler.fth
+
+( Branching constructs
+The words represent arrows; each is pointing either forward or backward, and towards or away.
+The "away" words are intended for use as arguments for branch assembler words. They will
+cause a branch to the next matching "towards" arrow in the specified direction. )
+: |--> ( -- l 0 )  ihere  0 ;
+: -->| ( l -- )  dup ihere swap - 2 -  swap 1+  c! ; \ write ihere-l-2 (offset) to l+1 (branch arg byte)
+: <--| ( -- )  ;
+: |<-- ( -- l )  ihere ;
 
 
 	( Live-use variables )
@@ -102,8 +111,9 @@ routine (@)
 	$00 lda(),y
 	tax
 	$00 inc0
-	there 2 + bne, \ skip next inc if no wrap
+	|--> bne, \ skip next inc if no wrap
 	$01 inc0
+-->|
 	$00 lda(),y
 	rts
 
@@ -316,8 +326,9 @@ primitive !
 	txa
 	$00 sta(),y
 	$00 inc0
-	there 2 + bne, \ skip next inc if no wrap
+	|--> bne, \ skip next inc if no wrap
 	$01 inc0
+-->|
 	pla
 	$00 sta(),y
 	(exit) jmp,
