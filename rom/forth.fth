@@ -23,20 +23,19 @@ variable idp  0 idp ! \ image data pointer; offset from image start
 $F000 constant image-target
 
 : >target ( i-addr -- t-addr )  image - image-target + ;
+: >image ( t-addr -- i-addr )  image-target - image + ;
 : >le ( u -- hi lo )  dup 8 rshift  swap $FF and ; \ to little-endian byte pair
 : le> ( hi lo -- u )  swap 8 lshift  or ;
 : le@ ( i-addr -- hi lo )  dup char+ c@ swap c@  le> ;
 
-( for manipulating image contents. all addresses relative to start of image )
-: ihere  idp @ ;
+( for manipulating image contents. all addresses are in the host )
+: ihere  idp @ image + ;
 : ialigned  dup 2 mod + ;
 : ialign  idp dup @  ialigned  swap ! ; \ cell-align idp
-: ic!  image + c! ;
-: ic@  image + c@ ;
-: ic,  ihere ic! 1 idp +! ;
+: ic,  ihere c! 1 idp +! ;
 : i,  >le ic, ic, ;
 
-: there  ihere image-target + ;
+: there  ihere >target ;
 
 : save-image ( c-addr u -- )
 	r/w create-file  0<> if exit then  >r
@@ -50,18 +49,25 @@ $F000 constant image-target
 	addr of previous word
 	run-time code pointer
 	data/body ...
+
+	On a real, old-school 6502, the indirect jump bug means that a dictionary entry
+	with the code pointer split between pages will be broken.
 )
-variable img-prevword  0 img-prevword !
+variable ilatest  0 ilatest ! \ target addr of latest word in image
 \ creates a dictionary entry, up to and including prev word addr
 : icreate
 	there \ to store prev word
-		bl word  dup c@ 1+  ihere image +  swap \ src dest u
-		dup idp +!
-		cmove \ put the name (counted string)
-		img-prevword @ i,
-	img-prevword ! ;
+		bl word count
+		dup ic, \ write length
+		ihere swap \ -- src dest len
+		dup idp +! \ increment idp by read word length
+		cmove \ put the name
+		ilatest @ i, \ write latest (now previous) word t-addr
+	ilatest ! \ store new latest word
+	;
 
-: prev-word ( w -- w->next )  count + le@ ;
+\ p is the t-addr of the word compiled previous to word at i-addr w
+: >previous ( w -- p )  count + le@ ;
 \ in this impl, an xt is a pointer to a word's code pointer
 : >xt ( w -- xt )  count + 2 + >target ;
 
@@ -150,14 +156,18 @@ primitive exit
 	(exit) jmp,
 
 : ifind ( addr u -- xt | 0 )
-	img-prevword @
+	ilatest @
 
-	begin \ addr u word-addr
-		image-target - image + \ convert from eventual addr to current
+	\ loop starts with ( addr u word -- )
+	\ word is the t-addr of the next word to check
+	begin
+		>image
 		dup >r  count \ a1 u1 a2 u2
 		2over compare 0= if \ have we found the word?
-			2drop r> >xt exit then \ then give xt and exit
-	r> prev-word  dup 0= until \ otherwise loop again, unless no more words
+			\ then give xt and exit
+			2drop r> >xt exit
+		then
+	r> >previous  dup 0= until \ otherwise loop again, unless no more words
 	2drop drop 0
 	;
 
