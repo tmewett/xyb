@@ -165,23 +165,24 @@ primitive exit
 	pla
 	(exit) jmp,
 
-: ifind ( addr u -- xt | 0 )
+: word-match?  ( c-addr word -- f )  count rot count compare 0= ;
+
+: ifind ( c-addr -- xt -1 | c-addr 0 )
 	ilatest @
 
-	\ loop starts with ( addr u word -- )
-	\ word is the t-addr of the next word to check
 	begin
 		>image
-		dup >r  count \ a1 u1 a2 u2
-		2over compare 0= if \ have we found the word?
+		2dup word-match? if \ have we found the word?
 			\ then give xt and exit
-			2drop r> >xt exit
+			nip >xt -1 exit
+		else
+			>previous
 		then
-	r> >previous  dup 0= until \ otherwise loop again, unless no more words
-	2drop drop 0
+	dup 0= until \ otherwise loop again, unless no more words
+	drop 0
 	;
 
-: i'  bl word count  ifind ;
+: i'  bl word  ifind  0= if ." word not found: " type cr bye then ;
 : [i']  i'  postpone literal ; immediate
 
 
@@ -260,21 +261,20 @@ host definition is executed and nothing else is compiled. )
 		find-name dup if name>int then
 	else 2drop 0 then ;
 
-: process-word ( addr u -- )
-	2dup host-word? dup if execute
-		else drop  2dup ifind dup if icompile,
-		else drop  2dup >number? if iliteral
+: process-word ( c-addr -- )
+	dup count host-word? dup if execute drop
+		else drop  ifind 0< if icompile,
+		else dup count >number? if iliteral drop
 		else ." invalid word in i: -> " type bye
-	then then then
-	2drop ;
+	then then then ;
 
 : i:
 	icreate  (colon) i,
 	begin \ keep reading and processing words until we see i;
-		bl word count \ addr u
-		2dup s" i;" compare 0<> while
+		bl word
+		dup count s" i;" compare 0<> while
 		process-word
-	repeat 2drop
+	repeat drop
 	[i'] exit icompile, ;
 
 : ^  ' execute ;
