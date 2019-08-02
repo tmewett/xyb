@@ -95,7 +95,6 @@ cause a branch to the next matching "towards" arrow in the specified direction. 
 $D0 constant sp \ stack pointer
 $D2 constant bodyptr \ addr of last executed word's data part
 $D4 constant rsp \ return sp
-$DE constant temp
 
 
 	( Execution )
@@ -251,33 +250,33 @@ host definition is executed and nothing else is compiled. )
 
 : iliteral  [i'] (literal) icompile,  i, ;
 
-: >number? ( c-addr u -- [u2] f )
-	\ if f is true, u2 is the given string as a number
-	0 0 2swap  >number nip nip  \ u2 u'
-	dup if nip then  0= ;
+: >number? ( c-addr u -- u2 true | c-addr u false )
+	0 0 2over  >number \ c u u2 u1 c' u'
+	0= >r 2drop
+	r> if nip nip true else drop false then ;
 
-: host-word? ( c-addr u -- xt | 0 )
-	over c@ [char] ^ = if
-		find-name dup if name>int then
-	else 2drop 0 then ;
+: macro-find  dup find 1 = if nip -1 else drop 0 then ;
 
 : process-word ( c-addr -- )
-	dup count host-word? dup if execute drop
-		else drop  ifind 0< if icompile,
-		else dup count >number? if iliteral drop
-		else ." invalid word in i: -> " type bye
+	macro-find if execute
+	else ifind 0< if icompile,
+	else count 2dup >number? if iliteral
+	else abort" unknown word in meta-compilation"
 	then then then ;
 
 : i:
 	icreate  (colon) i,
 	begin \ keep reading and processing words until we see i;
 		bl word
-		dup count s" i;" compare 0<> while
+		dup count s" ;" compare 0<> while
 		process-word
 	repeat drop
 	[i'] exit icompile, ;
 
-: ^  ' execute ;
+: macro
+	create  , immediate
+	does> @ iliteral ;
+
 
 primitive r>
 	0 ldy#
@@ -377,10 +376,6 @@ primitive nand ( x y -- ~(x&y) )
 	sp sta(),y
 	(exit) jmp,
 
-\ temporary variable in 222 = $DE
-: ^temp  temp iliteral ;
-i: t!  ^temp ! i;
-i: t@  ^temp @ i;
 
 include words.fth
 include tests.fth
