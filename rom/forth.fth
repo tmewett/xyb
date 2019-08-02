@@ -348,14 +348,12 @@ primitive + ( x y -- x+y )
 	sp lda(),y
 	2 ldy#
 	sp adc(),y
-	php \ save carry
 	sp sta(),y
 
 	sp inc0
 	0 ldy#
 	sp lda(),y
 	2 ldy#
-	plp \ restore carry
 	sp adc(),y
 	sp sta(),y
 
