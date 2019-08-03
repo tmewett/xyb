@@ -1,5 +1,5 @@
 \ temporary variable in 222 = $DE
-$DE macro temp
+$DE iconstant temp
 
 i: t!  temp ! ;
 i: t@  temp @ ;

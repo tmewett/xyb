@@ -66,11 +66,35 @@ variable ilatest  0 ilatest ! \ target addr of latest word in image
 	ilatest ! \ store new latest word
 	;
 
-\ p is the t-addr of the word compiled previous to word at i-addr w
+\ p is the previous word field (t-addr) of the word at i-addr w
 : >previous ( w -- p )  count + le@ ;
 \ in this impl, an xt is a pointer to a word's code pointer
 : >xt ( w -- xt )  count + 2 + >target ;
 
+\ Searching the dictionary
+
+: word-match?  ( c-addr word -- f )  count rot count compare 0= ;
+
+: ifind ( c-addr -- xt -1 | c-addr 0 )
+	ilatest @
+
+	begin
+		>image
+		2dup word-match? if \ have we found the word?
+			\ then give xt and exit
+			nip >xt -1 exit
+		else
+			>previous
+		then
+	dup 0= until \ otherwise loop again, unless no more words
+	drop 0
+	;
+
+: i'  bl word  ifind  0= if abort" word not found in image" then ;
+: [i']  i'  postpone literal ; immediate
+
+
+	( Assembler )
 
 \ A simple postfix assembler
 ( [arg] opcode -- )
@@ -83,21 +107,22 @@ include assembler.fth
 ( Branching constructs
 The words represent arrows; each is pointing either forward or backward, and towards or away.
 The "away" words are intended for use as arguments for branch assembler words. They will
-cause a branch to the next matching "towards" arrow in the specified direction. )
+cause a branch to the next matching "towards" arrow in the specified direction.
+Nesting these constructs is fine, but overlapping is not possible without extra stack manipulation. )
+
 : |--> ( -- l 0 )  ihere  0 ;
 : -->| ( l -- )  dup ihere swap - 2 -  swap 1+  c! ; \ write ihere-l-2 (offset) to l+1 (branch arg byte)
 : <--| ( -- )  ;
 : |<-- ( -- l )  ihere ;
 
 
-	( Live-use variables )
+	( Execution model )
 
 $D0 constant sp \ stack pointer
 $D2 constant bodyptr \ addr of last executed word's data part
 $D4 constant rsp \ return sp
 
-
-	( Execution )
+\ Start building the image now
 
 : routine  there constant ;
 
@@ -120,7 +145,7 @@ routine (@)
 routine (machine)
 	bodyptr jmp()
 
-\ begin sub-execution of a word with the given codeptr; the JSR of Forth words
+\ begin sub-execution of a word with the given xt
 routine (execute) \ XA=xt Y01
 	\ store xt
 	$00 stx0
@@ -145,7 +170,7 @@ routine (execute) \ XA=xt Y01
 	$01 sta0
 	$0000 jmp()
 
-\ the RTS of Forth words
+\ restore state saved by (execute)
 routine (exit)
 	\ restore bodyptr from return stack
 	pla
@@ -153,39 +178,6 @@ routine (exit)
 	pla
 	bodyptr 1+ sta0
 	rts
-
-: primitive  icreate  (machine) i, ;
-
-primitive exit
-	\ destroy 1 stack frame, from the (execute) which called us
-	pla
-	pla
-	pla
-	pla
-	(exit) jmp,
-
-: word-match?  ( c-addr word -- f )  count rot count compare 0= ;
-
-: ifind ( c-addr -- xt -1 | c-addr 0 )
-	ilatest @
-
-	begin
-		>image
-		2dup word-match? if \ have we found the word?
-			\ then give xt and exit
-			nip >xt -1 exit
-		else
-			>previous
-		then
-	dup 0= until \ otherwise loop again, unless no more words
-	drop 0
-	;
-
-: i'  bl word  ifind  0= if ." word not found: " type cr bye then ;
-: [i']  i'  postpone literal ; immediate
-
-
-	( Compilation )
 
 \ run-time code for colon definitions
 routine (colon)
@@ -204,8 +196,6 @@ routine (colon)
 	(execute) jsr,
 	\ repeat unconditionally; EXIT will return to caller
 	(colon) jmp,
-
-: icompile, ( xt -- )  i, ;
 
 routine push \ A=hi X=lo Y
 	\ stack grows down in memory, low byte mem-below high
@@ -226,6 +216,17 @@ routine pop \ puts A=hi X=lo Y
 	sp lda(),y
 	rts
 
+: primitive  icreate  (machine) i, ;
+
+\ the RTS of Forth words
+primitive exit
+	\ destroy 1 stack frame, from the (execute) which called us
+	pla
+	pla
+	pla
+	pla
+	(exit) jmp,
+
 \ pop bodyptr from return stack; push *bodyptr to stack; push bodyptr+2 to return stack
 primitive (literal)
 	clc
@@ -244,11 +245,11 @@ primitive (literal)
 	push jsr,
 	(exit) jmp,
 
-( The following definitions give us, the host, a nice syntax for compiling words
-to the image. In i:, if a word starts with ^ and it is defined in the host, the
-host definition is executed and nothing else is compiled. )
 
-: iliteral  [i'] (literal) icompile,  i, ;
+	( Meta-compilation )
+
+: icompile, ( xt -- )  i, ;
+: iliteral  [i'] (literal) icompile,  i, ; immediate
 
 : >number? ( c-addr u -- u2 true | c-addr u false )
 	0 0 2over  >number \ c u u2 u1 c' u'
@@ -260,23 +261,31 @@ host definition is executed and nothing else is compiled. )
 : process-word ( c-addr -- )
 	macro-find if execute
 	else ifind 0< if icompile,
-	else count 2dup >number? if iliteral
+	else count >number? if postpone iliteral
 	else abort" unknown word in meta-compilation"
 	then then then ;
 
+( This is the meta-compiler. It allows us to use Forth "syntax" to build the image
+dictionary. Because image words are not executable, we must first define any needed
+compile-time words, such as control structures, in the host as immediate words. The
+meta-compiler will execute any names it sees that have immediate definitions in the
+host; otherwise it will compile image words. )
 : i:
 	icreate  (colon) i,
-	begin \ keep reading and processing words until we see i;
+	begin \ keep reading and processing words until we see ;
 		bl word
 		dup count s" ;" compare 0<> while
 		process-word
 	repeat drop
 	[i'] exit icompile, ;
 
-: macro
+\ Creates an immediate host word which compiles a literal to the image
+: iconstant
 	create  , immediate
-	does> @ iliteral ;
+	does> @ postpone iliteral ;
 
+
+	( Build the system )
 
 primitive r>
 	0 ldy#

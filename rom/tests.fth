@@ -14,7 +14,7 @@ primitive c3!
 	$beef sta,
 	(exit) jmp,
 
-$beef macro beef
+$beef iconstant beef
 
 i: t.  beef c! ;
 i: rand  beef c@ ;
@@ -46,6 +46,8 @@ routine wordtest
 	>le ldx# lda#
 	(execute) jsr,
 	wordtest jmp,
+
+cr ." CURRENT IMAGE SIZE: " idp ? ." BYTES"
 
 \ put a jump to our chosen test at the top of the image
 0 idp !  wordtest jmp,
