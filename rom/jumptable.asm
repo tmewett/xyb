@@ -1,2 +1,0 @@
-jmp reset
-jmp getchar
