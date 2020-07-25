@@ -105,8 +105,12 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include "common.h"
-uint32_t SDL_GetTicks();
+
+
+//externally supplied functions
+uint8_t read6502(uint16_t address);
+void write6502(uint16_t address, uint8_t value);
+
 
 //6502 defines
 #define FIX_IND_JMP
@@ -180,10 +184,6 @@ uint32_t instructions = 0; //keep track of total instructions executed
 uint32_t clockticks6502 = 0, clockgoal6502 = 0;
 uint16_t oldpc, ea, reladdr, value, result;
 uint8_t opcode, oldstatus;
-
-//externally supplied functions
-/*extern uint8_t read6502(uint16_t address);
-extern void write6502(uint16_t address, uint8_t value);*/
 
 //a few general functions used by various other functions
 void push16(uint16_t pushval) {
@@ -451,7 +451,7 @@ static void brk() {
         if (str[0] == 'q') exit(0);
         if (sscanf(str, "%hx", &addr) < 0) break;
         printf("%04X:  ", addr);
-        for (int i=0; i<16; i++) printf("%02X ", read8(addr++));
+        for (int i=0; i<16; i++) printf("%02X ", read6502(addr++));
         printf("\n");
     }
 #else

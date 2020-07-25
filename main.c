@@ -10,8 +10,6 @@
 #include <SDL_timer.h>
 #include <SDL_mouse.h>
 
-#include "common.h"
-
 #define TILEW 8
 #define TILEH 8
 #define SCREENW 32
@@ -20,6 +18,11 @@
 #define WINDOWW (TILEW*(SCREENW+2*BORDERW))
 #define WINDOWH (TILEH*(SCREENH+2*BORDERW))
 #define SCALE 3
+
+#define CPUFREQ 1000000
+#define CLUMPSIZE (CPUFREQ/1000) // no. of cpu ticks to do between processing
+#define DRAWTICKS (CPUFREQ/30) // minimum no. of cpu ticks before redraw
+#define EVENTTICKS (CPUFREQ/60) // minimum no. of cpu ticks before redraw
 
 #define PERIPHSTART 0x0200
 #define INPUTLEN 6
@@ -42,6 +45,12 @@ extern uint16_t pc, status;
 #else
 #define DBGPRINTF(...)
 #endif
+
+// fake6502.c
+void reset6502();
+void irq6502();
+void exec6502();
+extern uint32_t clockticks6502;
 
 uint8_t mem[1<<16];
 uint8_t vbuf[SCREENH*SCREENW*2];
@@ -205,7 +214,7 @@ bool updatetimer(int n) {
 }
 
 
-uint8_t read8(uint16_t addr) {
+uint8_t read6502(uint16_t addr) {
 #ifdef DEBUG
 	if (addr == 0xBEEF) {
 		return rand() % 256;
@@ -226,7 +235,7 @@ uint8_t read8(uint16_t addr) {
 	return mem[addr];
 }
 
-void write8(uint16_t addr, uint8_t value) {
+void write6502(uint16_t addr, uint8_t value) {
 #ifdef DEBUG
 	if (addr == 0xBEEF) {
 		printf("($%04X)  $%02X = %d  (%s)\n", pc, value, value,
