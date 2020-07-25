@@ -1,28 +1,21 @@
-TARGET ?= xyb
-SRC_DIRS ?= .
+cflags := $(shell sdl2-config --cflags)
+libs := $(shell sdl2-config --libs)
 
-SRCS := $(shell find $(SRC_DIRS) -name \*.cpp -or -name \*.c -or -name \*.s)
-OBJS := $(addsuffix .o,$(basename $(SRCS)))
-DEPS := $(OBJS:.o=.d)
+ifeq ($(DEBUG),YES)
+	cflags += -g
+	cppflags += -DDEBUG
+else
+	cflags += -O2
+endif
 
-INC_DIRS := .
-INC_FLAGS := $(addprefix -I,$(INC_DIRS))
+%.o: %.c
+	$(CC) $(cppflags) $(CPPFLAGS) $(cflags) $(CFLAGS) -c $< -o $@
 
-CFLAGS := $(shell sdl2-config --cflags) -g -DDEBUG
-CPPFLAGS ?= $(INC_FLAGS) -MMD -MP
-LDLIBS := $(shell sdl2-config --libs)
-
-$(TARGET): $(OBJS)
-	$(CC) $(LDFLAGS) $(OBJS) -o $@ $(LOADLIBES) $(LDLIBS)
-
-%: %.asm
-	cl65 -t none --start-addr 0xE000 -o $@ $<
+xyb: main.o fake6502.o
 
 chars.gray: codepage.png
 	convert $< -depth 1 $@
 
 .PHONY: clean
 clean:
-	$(RM) $(TARGET) $(OBJS) $(DEPS)
-
--include $(DEPS)
+	$(RM) *.o xyb
