@@ -120,14 +120,14 @@ uint8_t inputread(uint16_t reg) {
 		return inputreg | buttons;
 	} else if (reg==3) {
 		signed int x;
-		uint32_t state = SDL_GetMouseState(&x, NULL);
+		SDL_GetMouseState(&x, NULL);
 		x /= SCALE;
 		x = CLAMP(x - TILEW*BORDERW, 0, SCREENW*TILEW-1);
 		if (inputreg & 1<<7) x /= TILEW;
 		return x;
 	} else if (reg==4) {
 		signed int y;
-		uint32_t state = SDL_GetMouseState(NULL, &y);
+		SDL_GetMouseState(NULL, &y);
 		y /= SCALE;
 		y = CLAMP(y - TILEH*BORDERW, 0, SCREENH*TILEH-1);
 		if (inputreg & 1<<6) y /= TILEH;
@@ -474,7 +474,7 @@ int main(int argc, char **argv) {
 
 	countfreq = SDL_GetPerformanceFrequency();
 
-	DBGPRINTF("keygridsize = %d\n", KEYGRIDSIZE);
+	DBGPRINTF("KEYGRIDSIZE = %ld\n", KEYGRIDSIZE);
 	reset();
 
 	uint32_t total = SDL_GetTicks();
