@@ -303,8 +303,7 @@ void reset() {
 	memset(&mem[SCREENSTART+768], 0x40, 768);
 
 	loadchars("chars.gray", CHARSSTART);
-	loadtomem("rom/rom1", ROMSTART);
-	loadtomem("rom/rom2", ROMSTART+0x1000);
+	loadtomem("a.o65", ROMSTART);
 
 	write16(0xFFFC, ROMSTART); // set initial pc
 	write16(0xFFFE, ROMSTART); // for now, restart on IRQ
