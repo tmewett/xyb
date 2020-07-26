@@ -32,7 +32,8 @@
 
 #define ROMSTART 0xE000
 #define CHARSSTART 0xD800 // 0x800=2048 before ROM
-#define SCREENSTART 0xD000 // 0x800 before chars
+#define VIDEOSTART 0xD000 // 0x800 before chars
+#define VIDEOSIZE (SCREENH*SCREENW*2)
 
 #define MIN(x, y) ((x)<(y)?(x):(y))
 #define MAX(x, y) ((x)>(y)?(x):(y))
@@ -41,10 +42,10 @@
 
 #ifdef DEBUG
 extern uint16_t pc, status;
-#define DBGPRINTF(s, ...) printf((s), __VA_ARGS__)
+#define DEBUGPRINTF(s, ...) printf((s), __VA_ARGS__)
 #define FLAGSTR(mask, s) (status & (mask) ? (s) : "-")
 #else
-#define DBGPRINTF(...)
+#define DEBUGPRINTF(...)
 #endif
 
 // fake6502.c
@@ -53,12 +54,10 @@ void irq6502();
 void exec6502();
 extern uint32_t clockticks6502;
 
-uint8_t mem[1<<16];
-uint8_t vbuf[SCREENH*SCREENW*2];
-
-SDL_Window *Win;
-SDL_Surface *WinSurf;
-SDL_Surface *Screen;
+// SDL2
+SDL_Window *window;
+SDL_Surface *windowsurface;
+SDL_Surface *screen;
 uint8_t palette[] = { // pico-8's colours
 	0x00, 0x00, 0x00, // R,G,B
 	0x5f, 0x57, 0x50,
@@ -78,6 +77,14 @@ uint8_t palette[] = { // pico-8's colours
 	0x2c, 0xab, 0xfe
 };
 
+// Runtime
+uint8_t memory[1<<16];
+
+uint64_t countfreq;
+uint32_t asleep = 0;
+int frames = 0;
+
+
 SDL_Keycode keygrid[] = {
 	SDLK_QUOTE, SDLK_COMMA, SDLK_MINUS, SDLK_PERIOD, SDLK_SLASH, SDLK_SEMICOLON, SDLK_EQUALS, SDLK_LEFTBRACKET,
 	SDLK_RIGHTBRACKET, SDLK_BACKSLASH, SDLK_BACKQUOTE, SDLK_0, SDLK_1, SDLK_2, SDLK_3, SDLK_4,
@@ -89,18 +96,15 @@ SDL_Keycode keygrid[] = {
 };
 #define KEYGRIDSIZE (sizeof(keygrid)/sizeof(SDL_Keycode))
 
+uint8_t kbrow = 0;
+uint8_t gotchar = 0;
 bool keydown[KEYGRIDSIZE];
-
-uint64_t countfreq;
-uint32_t asleep = 0;
-int frames = 0;
-
 
 /* inputreg - XYLMRCxx
 	X,Y - scale resp mouse coord to character cells
 	L,M,R - left/middle/right mouse buttons down
 	C - update gotchar reg */
-uint8_t kbrow, inputreg = 0x04, gotchar;
+uint8_t inputreg = 0x04;
 
 uint8_t inputread(uint16_t reg) {
 	if (reg==0) {
@@ -152,15 +156,18 @@ void inputwrite(uint16_t reg, uint8_t value) {
 	C - draw cursor
 	P - buffer paged into memory
 	D - buffer to draw */
+// Elements 1 and 2 are cursor X and Y positions
 uint8_t gfxreg[3];
+uint8_t videobackbuf[VIDEOSIZE];
+
 void gfxwrite(uint16_t reg, uint8_t value) {
 	// was P bit changed?
 	if (reg==0 && ((value ^ gfxreg[0]) & 0x40)) {
 		// swap video RAM and buffer
-		uint8_t temp[SCREENH*SCREENW*2];
-		memcpy(temp, &mem[SCREENSTART], SCREENH*SCREENW*2);
-		memcpy(&mem[SCREENSTART], vbuf, SCREENH*SCREENW*2);
-		memcpy(vbuf, temp, SCREENH*SCREENW*2);
+		uint8_t temp[VIDEOSIZE];
+		memcpy(temp, &memory[VIDEOSTART], VIDEOSIZE);
+		memcpy(&memory[VIDEOSTART], videobackbuf, VIDEOSIZE);
+		memcpy(videobackbuf, temp, VIDEOSIZE);
 	}
 	gfxreg[reg] = value;
 }
@@ -233,7 +240,7 @@ uint8_t read6502(uint16_t addr) {
 	if (addr >= i && addr < i + TIMERLEN) {
 		return timerread(addr - i);
 	}
-	return mem[addr];
+	return memory[addr];
 }
 
 void write6502(uint16_t addr, uint8_t value) {
@@ -255,7 +262,7 @@ void write6502(uint16_t addr, uint8_t value) {
 	if (addr >= i && addr < i + TIMERLEN) {
 		return timerwrite(addr - i, value);
 	}
-	mem[addr] = value;
+	memory[addr] = value;
 }
 
 void write16(uint16_t address, uint16_t value) {
@@ -276,7 +283,7 @@ void loadtomem(char *fname, uint16_t addr) {
 		perror("loadtomem");
 		exit(1);
 	}
-	fread(&mem[addr], 1, 0x10000-addr, f);
+	fread(&memory[addr], 1, 0x10000-addr, f);
 	fclose(f);
 }
 
@@ -292,7 +299,7 @@ void loadchars(char *fname, uint16_t addr) {
 		// i is the left-to-right index of c in the file
 		// j is the desired transformed index in memory
 		int j = (i%16)*8 + (i%128)/16 + (i/128)*128;
-		mem[addr+j] = c;
+		memory[addr+j] = c;
 	}
 	fclose(f);
 }
@@ -300,8 +307,8 @@ void loadchars(char *fname, uint16_t addr) {
 void reset() {
 	srand(time(NULL));
 
-	memset(mem, 0, 0x10000);
-	memset(&mem[SCREENSTART+768], 0x40, 768);
+	memset(memory, 0, 0x10000);
+	memset(&memory[VIDEOSTART+768], 0x40, 768);
 
 	loadchars("chars.gray", CHARSSTART);
 	loadtomem("a.o65", ROMSTART);
@@ -321,7 +328,7 @@ void drawglyph(uint8_t glyph, uint8_t colour, int x, int y) {
 	bool invert = (gfxreg[0] & 0xF0) && x == gfxreg[1] && y == gfxreg[2];
 
 	for (int gy=0; gy<8; gy++) {
-		uint8_t bits = mem[CHARSSTART+glyph*8+gy];
+		uint8_t bits = memory[CHARSSTART + glyph*8 + gy];
 		int sy = TILEH*(y+BORDERW) + gy;
 
 		for (int gx=0; gx<8; gx++) {
@@ -331,25 +338,24 @@ void drawglyph(uint8_t glyph, uint8_t colour, int x, int y) {
 			if (invert) usefg = !usefg;
 			int index = usefg ? fg : bg;
 
-			((uint32_t *)Screen->pixels)[sy*WINDOWW+sx] = \
-				SDL_MapRGB(Screen->format, palette[index], palette[index+1], palette[index+2]);
+			((uint32_t *)screen->pixels)[sy*WINDOWW+sx] = \
+				SDL_MapRGB(screen->format, palette[index], palette[index+1], palette[index+2]);
 		}
 	}
 }
 
 void drawscreen() {
-	uint8_t cfg = gfxreg[0] & 0x60;
+	uint8_t drawconfig = gfxreg[0] & 0x60;
 	// are the page and draw bits the same? then use RAM, otherwise use buffer
-	uint8_t *buf = (cfg == 0x60 || cfg == 0x00) ? &mem[SCREENSTART] : vbuf;
+	uint8_t *buf = (drawconfig ^ drawconfig == 0x00) ? &memory[VIDEOSTART] : videobackbuf;
 
 	//~ for (int i=0; i<256; i++) {
 	for (int i=0; i<SCREENH*SCREENW; i++) {
 		drawglyph(buf[i], buf[0x300+i], i%SCREENW, i/SCREENW);
-		//~ drawglyph(i, i%16, i/16);
 	}
 
-	SDL_BlitScaled(Screen, NULL, WinSurf, NULL);
-	SDL_UpdateWindowSurface(Win);
+	SDL_BlitScaled(screen, NULL, windowsurface, NULL);
+	SDL_UpdateWindowSurface(window);
 	frames++;
 }
 
@@ -362,15 +368,21 @@ void handlekeyevent(SDL_KeyboardEvent *e) {
 
 	// send characters for backspace and line feed
 	if (e->type == SDL_KEYDOWN && (inputreg & 0x04)) {
-		if (code == SDLK_RETURN) gotchar = 8;
-		else if (code == SDLK_BACKSPACE) gotchar = 10;
+		if (code == SDLK_RETURN) {
+			gotchar = 8;
+		} else if (code == SDLK_BACKSPACE) {
+			gotchar = 10;
+		}
 	}
 
 	for (int i=0; i < KEYGRIDSIZE; i++) {
 		if (keygrid[i] == code) {
-			if (e->type == SDL_KEYUP && keydown[i] || e->type == SDL_KEYDOWN)
-				DBGPRINTF("%s %s\n", SDL_GetKeyName(keygrid[i]), e->type == SDL_KEYDOWN ? "down" : "up");
-			keydown[i] = e->type == SDL_KEYDOWN;
+#ifdef DEBUG
+			if (e->type == SDL_KEYUP && keydown[i] || e->type == SDL_KEYDOWN) {
+				printf("%s %s\n", SDL_GetKeyName(keygrid[i]), e->type == SDL_KEYDOWN ? "down" : "up");
+			}
+#endif
+			keydown[i] = (e->type == SDL_KEYDOWN);
 			break;
 		}
 	}
@@ -459,24 +471,27 @@ void sdlfatal() {
 }
 
 int main(int argc, char **argv) {
-
 	if (SDL_Init(SDL_INIT_VIDEO) < 0) sdlfatal();
-
-	Win = SDL_CreateWindow("XY Brewer", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, \
-		SCALE*WINDOWW, SCALE*WINDOWH, 0);
-	if (Win == NULL) sdlfatal();
-
-	WinSurf = SDL_GetWindowSurface(Win);
-	if (WinSurf == NULL) sdlfatal();
-
-	Screen = SDL_CreateRGBSurfaceWithFormat(0, WINDOWW, WINDOWH, 32, SDL_PIXELFORMAT_RGBA32);
-	if (Screen == NULL) sdlfatal();
 
 	countfreq = SDL_GetPerformanceFrequency();
 
-	DBGPRINTF("KEYGRIDSIZE = %ld\n", KEYGRIDSIZE);
-	reset();
+	window = SDL_CreateWindow(
+		"XY Brewer",
+		SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+		SCALE*WINDOWW, SCALE*WINDOWH,
+		0
+	);
+	if (window == NULL) sdlfatal();
 
+	windowsurface = SDL_GetWindowSurface(window);
+	if (windowsurface == NULL) sdlfatal();
+
+	screen = SDL_CreateRGBSurfaceWithFormat(0, WINDOWW, WINDOWH, 32, SDL_PIXELFORMAT_RGBA32);
+	if (screen == NULL) sdlfatal();
+
+	DEBUGPRINTF("KEYGRIDSIZE = %ld\n", KEYGRIDSIZE);
+
+	reset();
 	uint32_t total = SDL_GetTicks();
 
 	mainloop();
