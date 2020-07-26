@@ -1,3 +1,5 @@
+#include <stdint.h>
+#include <inttypes.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -21,8 +23,7 @@
 
 #define CPUFREQ 1000000
 #define CLUMPSIZE (CPUFREQ/1000) // no. of cpu ticks to do between processing
-#define DRAWTICKS (CPUFREQ/30) // minimum no. of cpu ticks before redraw
-#define EVENTTICKS (CPUFREQ/60) // minimum no. of cpu ticks before redraw
+#define EVENTTICKS (CPUFREQ/30) // minimum no. of cpu ticks before redraw/event handling
 
 #define PERIPHSTART 0x0200
 #define INPUTLEN 6
@@ -382,46 +383,73 @@ void handletextevent(SDL_TextInputEvent *e) {
 	}
 }
 
-int handleevents() {
+void handleevents(bool *quit) {
 	SDL_Event e;
-	SDL_PollEvent(&e);
-	if (e.type == SDL_QUIT) {
-		return 1;
-	} else if (e.type == SDL_KEYDOWN || e.type == SDL_KEYUP) {
-		handlekeyevent(&e.key);
-	} else if (e.type == SDL_TEXTINPUT) {
-		handletextevent(&e.text);
+	while (SDL_PollEvent(&e)) {
+		if (e.type == SDL_QUIT) {
+			*quit = true;
+			return;
+		} else if (e.type == SDL_KEYDOWN || e.type == SDL_KEYUP) {
+			handlekeyevent(&e.key);
+		} else if (e.type == SDL_TEXTINPUT) {
+			handletextevent(&e.text);
+		}
 	}
-
-	return 0;
 }
 
-void stretchysleep(uint64_t delta) {
-	static int64_t overcount = 0;
+void mainloop() {
+	/* Run the simulator.
 
-	uint64_t clumpcount = countfreq / CPUFREQ * CLUMPSIZE;
-	int64_t gap = clumpcount - delta;
+	This uses some slightly complex time budgeting in order to ensure actions
+	occur, on average, at the correct rate. The CPU is run at full speed in
+	clumps of CLUMPSIZE clock ticks, with time measurements, sleeping and event
+	handling in-between clumps.
+	*/
+	uint64_t lastcount = SDL_GetPerformanceCounter();
+	uint32_t lastevents = clockticks6502;
+	bool quit;
 
-	if (gap > 0) {
-		// We finished too early, so sleep. But adjust our sleep time down to
-		// account for any "debt" from previous late finishes
-		uint64_t sleep;
-		uint32_t sleepms;
+	// How many counts we want the current loop to take
+	uint64_t target = 0;
+	// Difference between the target and the actual elapsed count
+	int64_t credit = 0;
 
-		sleep = gap - MIN(overcount, gap);
-		sleepms = 1000*sleep/countfreq;
+	while (!quit) {
+		// Credit by the difference between target and elapsed count
+		uint64_t newcount = SDL_GetPerformanceCounter();
+		credit += target - (newcount - lastcount);
+		lastcount = newcount;
 
-		// ~ printf("SS: %d to fill, with debt %d, so sleeping %d (%d ms)\n", gap, overcount, sleep, sleepms);
-		sleep = SDL_GetPerformanceCounter();
-		SDL_Delay(sleepms);
+		target = 0;  // Reset recording
 
-		// Decrease overcount by the amount of time we didn't sleep
-		overcount -= gap - (SDL_GetPerformanceCounter() - sleep);
+		if (credit > 0) {
+			// Do we have spare time? Let's sleep
+			uint32_t tosleep = 1000 * credit / countfreq;  // convert to milliseconds
+			asleep += tosleep;
+			SDL_Delay(tosleep);
 
-		asleep += sleepms;
-	} else {
-		// We finished too late, so record how much by (gap is -ve)
-		overcount -= gap;
+			// SDL_Delay is much lower resolution then the performance counter,
+			// and sleeping can be inaccurate. So we'll record how long we
+			// wanted the sleep to take, in counts
+			target += credit;
+
+			credit = 0;
+		}
+
+		bool irq = false;
+		if (updatetimer(0)) irq = true;
+		if (updatetimer(1)) irq = true;
+		if (irq) irq6502();
+
+		exec6502(CLUMPSIZE);
+		target += countfreq / CPUFREQ * CLUMPSIZE;
+
+		int32_t untilevents = (lastevents + EVENTTICKS) - clockticks6502;
+		if (untilevents <= 0) {
+			drawscreen();
+			handleevents(&quit);
+			lastevents = clockticks6502 + untilevents;
+		}
 	}
 }
 
@@ -449,32 +477,9 @@ int main(int argc, char **argv) {
 	DBGPRINTF("keygridsize = %d\n", KEYGRIDSIZE);
 	reset();
 
-	uint64_t lastcount;
-	uint32_t lastdraw, lastevents, total = SDL_GetTicks();
-	lastdraw = lastevents = clockticks6502;
+	uint32_t total = SDL_GetTicks();
 
-	while (1) {
-		lastcount = SDL_GetPerformanceCounter();
-
-		if (clockticks6502 > lastevents + EVENTTICKS) {
-			if (handleevents()) break;
-			lastevents += EVENTTICKS;
-		}
-
-		bool irq = false;
-		if (updatetimer(0)) irq = true;
-		if (updatetimer(1)) irq = true;
-		if (irq) irq6502();
-
-		exec6502(CLUMPSIZE);
-
-		if (clockticks6502 > lastdraw + DRAWTICKS) {
-			drawscreen();
-			lastdraw += DRAWTICKS;
-		}
-
-		stretchysleep(SDL_GetPerformanceCounter() - lastcount);
-	}
+	mainloop();
 
 	total = SDL_GetTicks() - total;
 	printf("Averaged %.3f MHz CPU, %.3f FPS\n",
