@@ -12,6 +12,7 @@ endif
 	$(CC) $(cppflags) $(CPPFLAGS) $(cflags) $(CFLAGS) -c $< -o $@
 
 xyb: main.o fake6502.o
+	$(CC) $(cflags) $(CFLAGS) $^ $(libs) $(LDFLAGS) -o $@
 
 chars.gray: codepage.png
 	convert $< -depth 1 $@
