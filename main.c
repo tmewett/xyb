@@ -320,26 +320,51 @@ void reset() {
 }
 
 void drawglyph(uint8_t glyph, uint8_t colour, int x, int y) {
-	// upper 4 bits are index of foreground colour, lower 4 are background
-	int fg = (colour >> 4) & 0xF;
-	int bg = colour & 0xF;
-	fg *= 3; bg *= 3;
+	/* Draw glyph ID `glyph` at (x, y) with given colour.
+
+	A glyph is a sequence of 8 bytes stored in the character RAM. Each byte
+	describes one row of an 8x8 square image, in descending order:
+
+	    76543210 (byte 0)
+	    76543210
+	    76543210
+	    76543210
+	    76543210
+	    76543210
+	    76543210
+	    76543210 (byte 7)
+
+	In each row byte, high-to-low bit order corresponds with left-to-right video
+	order.
+
+	The colour byte is XXXXYYYY, where XXXX is the 4-bit palette index of the
+	foreground colour, and YYYY is the the same for the background.
+	*/
+	// Multiply by 3 so we index into palette array properly.
+	int fgcol = ((colour >> 4) & 0xF) * 3;
+	int bgcol = (colour & 0xF) * 3;
 
 	bool invert = (gfxreg[0] & 0xF0) && x == gfxreg[1] && y == gfxreg[2];
 
 	for (int gy=0; gy<8; gy++) {
-		uint8_t bits = memory[CHARSSTART + glyph*8 + gy];
+		uint8_t row = memory[CHARSSTART + glyph*8 + gy];
 		int sy = TILEH*(y+BORDERW) + gy;
 
-		for (int gx=0; gx<8; gx++) {
+		for (int gx=7; gx >= 0; gx--) {
 			int sx = TILEW*(x+BORDERW) + gx;
 
-			int usefg = bits & 128>>gx;
+			int usefg = row & 1;
 			if (invert) usefg = !usefg;
-			int index = usefg ? fg : bg;
+			int index = usefg ? fgcol : bgcol;
 
-			((uint32_t *)screen->pixels)[sy*WINDOWW+sx] = \
-				SDL_MapRGB(screen->format, palette[index], palette[index+1], palette[index+2]);
+			((uint32_t *)screen->pixels)[sy*WINDOWW + sx] = SDL_MapRGB(
+				screen->format,
+				palette[index + 0],
+				palette[index + 1],
+				palette[index + 2]
+			);
+
+			row >>= 1;
 		}
 	}
 }
@@ -349,9 +374,9 @@ void drawscreen() {
 	// are the page and draw bits the same? then use RAM, otherwise use buffer
 	uint8_t *buf = (drawconfig ^ drawconfig == 0x00) ? &memory[VIDEOSTART] : videobackbuf;
 
-	//~ for (int i=0; i<256; i++) {
 	for (int i=0; i<SCREENH*SCREENW; i++) {
 		drawglyph(buf[i], buf[0x300+i], i%SCREENW, i/SCREENW);
+		// drawglyph(i, 0x40, i%SCREENW, i/SCREENW);
 	}
 
 	SDL_BlitScaled(screen, NULL, windowsurface, NULL);
