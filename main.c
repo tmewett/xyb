@@ -372,7 +372,7 @@ void drawglyph(uint8_t glyph, uint8_t colour, int x, int y) {
 void drawscreen() {
 	uint8_t drawconfig = gfxreg[0] & 0x60;
 	// are the page and draw bits the same? then use RAM, otherwise use buffer
-	uint8_t *buf = (drawconfig ^ drawconfig == 0x00) ? &memory[VIDEOSTART] : videobackbuf;
+	uint8_t *buf = (drawconfig == 0x60 || drawconfig == 0x00) ? &memory[VIDEOSTART] : videobackbuf;
 
 	for (int i=0; i<SCREENH*SCREENW; i++) {
 		drawglyph(buf[i], buf[0x300+i], i%SCREENW, i/SCREENW);
