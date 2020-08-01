@@ -196,14 +196,16 @@ void timerwrite(uint16_t reg, uint8_t value) {
 	int n = reg/3;
 	reg %= 3;
 	if (reg==0) {
-		// is enable going 0 -> 1 ?
 		timerreg[n] = value;
 	} else {
 		// unset enable
-		timerreg[n] &= ~0x8F;
+		timerreg[n] &= ~0x80;
+
 		// set appropriate byte (hacky)
-		timerinit[n] &= 0xFF00 >> 8*(reg-1);
-		timerinit[n] |= (uint16_t)value << 8*(reg-1);
+		// The little system is little endian, so shift only for higher register
+		uint16_t setmask = 0xFF << 2*(reg-1);  // -1 because reg is 1 or 2 here
+		timerinit[n] &= 0xFFFF ^ setmask;  // clear all but complement of setmask
+		timerinit[n] |= (uint16_t)value & setmask;  // copy in masked value
 		timerval[n] = timerinit[n];
 	}
 }
@@ -214,10 +216,16 @@ bool updatetimer(int n) {
 	if (timerval[n] == 0) { // enabled and zero?
 		timerreg[n] |= 0x10; // set finished flag
 		if (timerreg[n] & 0x20) irq = true;
-		if (timerreg[n] & 0x40) timerval[n] = timerinit[n]; // refill if set
-		else timerreg[n] &= ~0x8F; // disable otherwise
-	} else
+		if (timerreg[n] & 0x40) {
+			// refill if specified
+			timerval[n] = timerinit[n];
+		} else {
+			// disable otherwise
+			timerreg[n] &= ~0x80;
+		}
+	} else {
 		timerval[n] -= 1;
+	}
 	return irq;
 }
 
