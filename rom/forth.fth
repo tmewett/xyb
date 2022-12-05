@@ -121,6 +121,11 @@ Nesting these constructs is fine, but overlapping is not possible without extra 
 $D0 constant sp \ stack pointer
 $D2 constant bodyptr \ addr of last executed word's data part
 $D4 constant rsp \ return sp
+$D6 constant bufp
+$D7 constant i>in
+$0500 constant linebuf
+
+$E003 constant getc
 
 \ Start building the image now
 
@@ -382,6 +387,44 @@ primitive nand ( x y -- ~(x&y) )
 	$FF eor#
 	sp sta(),y
 	(exit) jmp,
+
+primitive refill
+	0 lda#
+	i>in sta0
+|<--
+	getc jsr,
+	bufp ldx0
+	linebuf sta,x
+	bufp inc0
+	8 cmp# \ newline?
+	<--| bne,
+	(exit) jmp,
+
+primitive parse ( c -- c-addr u )
+	pop jsr,
+	$00 stx0
+	linebuf >le drop lda#
+
+	i>in ldx0
+|<--
+	linebuf lda,x
+	$00 cmp0
+	|--> beq,
+	inx
+	swap <--| bne, \ X never zero here
+-->|
+	\ here: put length on stack
+|<--
+	linebuf lda,x
+	$00 cmp0
+	|--> bne,
+	inx
+	swap <--| bne, \ X never zero here
+-->|
+	\ here: update >in
+
+	(exit) jmp,
+
 
 
 include words.fth

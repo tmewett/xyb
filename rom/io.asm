@@ -86,7 +86,7 @@ left:
 
 ; Begins line input with basic editing support.
 ; Input ends when the enter key is pressed. The buffer includes the newline if there is space.
-.proc readline ; AX
+.proc readline ; AXY
 	ldx #0
 	stx LINEBUF
 getc:
@@ -164,3 +164,11 @@ getc:
 	rts
 .endproc
 .export getchar
+
+
+.proc fgetc ; puts A=char
+	ldx FILENO
+	beq getchar
+	rts
+.endproc
+.export fgetc

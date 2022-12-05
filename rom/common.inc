@@ -14,6 +14,7 @@ TERMCFG = $0302 ; Lxxxxxxx
 SCREENPTR = $F0
 COLOURPTR = $F2
 CHARIN = INPUTSTART+5
+FILENO = $0301
 ; input line buffer for IO. first byte is length of contents
 LBUFLEN = 64
 LBUFOFF = $0303
